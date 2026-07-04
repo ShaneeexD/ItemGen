@@ -1,0 +1,41 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <RootNamespace>ItemGen</RootNamespace>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <OutputType>Library</OutputType>
+    <Version>1.0.0</Version>
+    <OutputPath>bin\$(Configuration)\$(ProjectName)\$(AssemblyName)\</OutputPath>
+    <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+    <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
+    <AssemblyName>ItemGen.Server</AssemblyName>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="SPTarkov.Common" Version="4.0.13" />
+    <PackageReference Include="SPTarkov.DI" Version="4.0.13" />
+    <PackageReference Include="SPTarkov.Server.Core" Version="4.0.13" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="config\**\*.json" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="package.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <Target Name="DeployToSPT" AfterTargets="Build">
+    <PropertyGroup>
+      <SPTModDir>C:\SPT\SPT\user\mods\ItemGen</SPTModDir>
+    </PropertyGroup>
+    <MakeDir Directories="$(SPTModDir)" />
+    <MakeDir Directories="$(SPTModDir)\config" />
+    <Copy SourceFiles="$(OutputPath)$(AssemblyName).dll" DestinationFolder="$(SPTModDir)" OverwriteReadOnlyFiles="true" />
+    <Copy SourceFiles="$(OutputPath)package.json" DestinationFolder="$(SPTModDir)" OverwriteReadOnlyFiles="true" />
+    <Copy SourceFiles="$(OutputPath)$(AssemblyName).pdb" DestinationFolder="$(SPTModDir)" OverwriteReadOnlyFiles="true" Condition="Exists('$(OutputPath)$(AssemblyName).pdb')" />
+    <ItemGroup>
+      <ConfigFiles Include="$(ProjectDir)config\**\*.json" />
+    </ItemGroup>
+    <Copy SourceFiles="@(ConfigFiles)" DestinationFiles="@(ConfigFiles->'$(SPTModDir)\config\%(Filename)%(Extension)')" OverwriteReadOnlyFiles="true" />
+    <Message Text="[ItemGen] Deployed to $(SPTModDir)" Importance="high" />
+  </Target>
+</Project>

@@ -1,0 +1,9 @@
+{
+  "name": "itemgen",
+  "version": "1.0.0",
+  "description": "Framework for generating custom items for SPTarkov",
+  "author": "Serenity",
+  "license": "MIT",
+  "main": "ItemGen.Server.dll",
+  "sptVersion": "4.0.13"
+}
