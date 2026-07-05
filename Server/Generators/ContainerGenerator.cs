@@ -1,3 +1,5 @@
+using System.Collections.Generic;
+using System.Linq;
 using System.Text.Json;
 using ItemGen.Converters;
 using SPTarkov.Server.Core.Models.Common;
@@ -12,37 +14,35 @@ using ItemGen.Models;
 
 namespace ItemGen.Generators;
 
-public static class KeyGenerator
+public static class ContainerGenerator
 {
-    private const string KeyMechanicalParentId = "5c99f98d86f7745c314214b3";
-
     public static void RegisterAll(
         CustomItemService customItemService,
         DatabaseService databaseService,
-        IReadOnlyList<KeyDefinition> definitions,
+        IReadOnlyList<ContainerDefinition> definitions,
         ISptLogger<ItemGenPlugin> logger)
     {
         foreach (var def in definitions)
         {
             try
             {
-                RegisterKey(def, customItemService, databaseService, logger);
+                RegisterContainer(def, customItemService, databaseService, logger);
             }
             catch (Exception ex)
             {
-                logger.LogWithColor($"[ItemGen] Failed to register key '{def.Name}': {ex.Message}", LogTextColor.Red);
+                logger.LogWithColor($"[ItemGen] Failed to register container '{def.Name}': {ex.Message}", LogTextColor.Red);
             }
         }
     }
 
-    private static void RegisterKey(
-        KeyDefinition def,
+    private static void RegisterContainer(
+        ContainerDefinition def,
         CustomItemService customItemService,
         DatabaseService databaseService,
         ISptLogger<ItemGenPlugin> logger)
     {
-        var parentId = ResolveParentId(databaseService, def.BaseTpl);
-        var handbookParentId = ResolveHandbookParent(databaseService, def.BaseTpl);
+        var parentId = ResolveParentId(databaseService, def);
+        var handbookParentId = ResolveHandbookParent(databaseService, def);
 
         TemplateItemProperties? overrides = null;
         if (def.Properties.ValueKind != JsonValueKind.Undefined && def.Properties.ValueKind != JsonValueKind.Null)
@@ -55,6 +55,7 @@ public static class KeyGenerator
 
         overrides ??= new TemplateItemProperties();
 
+        // Ensure core identity fields from the editor are applied over the cloned vanilla props.
         overrides.Name = def.ShortName;
         overrides.ShortName = def.ShortName;
         overrides.Description = def.Description;
@@ -63,10 +64,6 @@ public static class KeyGenerator
         {
             overrides.BackgroundColor = def.BackgroundColor;
         }
-        overrides.MaximumNumberOfUsage = def.Uses;
-        overrides.KeyIds = def.DoorIds.Count == 0 ? null : def.DoorIds;
-        overrides.CanSellOnRagfair = def.CanSellOnRagfair;
-        overrides.RarityPvE = def.RarityPvE;
 
         // Do not override the model if no custom path is provided.
         if (overrides.Prefab is { Path: "" or null })
@@ -102,37 +99,47 @@ public static class KeyGenerator
 
         if (result.Success == true)
         {
-            logger.LogWithColor($"[ItemGen] Registered key: {def.Name} ({def.Id})", LogTextColor.Green);
+            logger.LogWithColor($"[ItemGen] Registered container: {def.Name} ({def.Id})", LogTextColor.Green);
         }
         else
         {
             logger.LogWithColor(
-                $"[ItemGen] CreateItemFromClone reported failure for key '{def.Name}': {string.Join(", ", result.Errors ?? [])}",
+                $"[ItemGen] CreateItemFromClone reported failure for container '{def.Name}': {string.Join(", ", result.Errors ?? [])}",
                 LogTextColor.Yellow);
         }
     }
 
-    private static string ResolveParentId(DatabaseService databaseService, string baseTpl)
+    private static string ResolveParentId(DatabaseService databaseService, ContainerDefinition def)
     {
+        if (!string.IsNullOrWhiteSpace(def.Parent))
+        {
+            return def.Parent;
+        }
+
         var items = databaseService.GetItems();
-        if (items.TryGetValue(baseTpl, out var baseItem) && !string.IsNullOrWhiteSpace(baseItem.Parent))
+        if (items.TryGetValue(def.BaseTpl, out var baseItem) && !string.IsNullOrWhiteSpace(baseItem.Parent))
         {
             return baseItem.Parent;
         }
-        return KeyMechanicalParentId;
+        return "5795f317245977243854e041"; // SimpleContainer
     }
 
-    private static string ResolveHandbookParent(DatabaseService databaseService, string baseTpl)
+    private static string ResolveHandbookParent(DatabaseService databaseService, ContainerDefinition def)
     {
-        var items = databaseService.GetItems();
-        if (items.TryGetValue(baseTpl, out var baseItem))
+        if (!string.IsNullOrWhiteSpace(def.HandbookParentId))
         {
-            var handbook = databaseService.GetHandbook().Items.FirstOrDefault(h => h.Id == baseTpl);
+            return def.HandbookParentId;
+        }
+
+        var items = databaseService.GetItems();
+        if (items.TryGetValue(def.BaseTpl, out var baseItem))
+        {
+            var handbook = databaseService.GetHandbook().Items.FirstOrDefault(h => h.Id == def.BaseTpl);
             if (handbook != null && !string.IsNullOrWhiteSpace(handbook.ParentId))
             {
                 return handbook.ParentId;
             }
         }
-        return "5b47574386f77428ca22b33f"; // Keys
+        return "5b5f6fa186f77409407a7eb7"; // Containers
     }
 }

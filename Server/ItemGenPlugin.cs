@@ -69,9 +69,12 @@ public class ItemGenPlugin(
             var enabledQuestItems = questDefinitions.Where(d => d.Enabled).ToList();
             var keyDefinitions = packs.SelectMany(p => p.Definition.Keys).ToList();
             var enabledKeys = keyDefinitions.Where(d => d.Enabled).ToList();
+            var containerDefinitions = packs.SelectMany(p => p.Definition.Containers).ToList();
+            var enabledContainers = containerDefinitions.Where(d => d.Enabled).ToList();
 
             logger.LogWithColor($"[ItemGen] Loaded {questDefinitions.Count} quest item definition(s), {enabledQuestItems.Count} enabled.", LogTextColor.Cyan);
             logger.LogWithColor($"[ItemGen] Loaded {keyDefinitions.Count} key definition(s), {enabledKeys.Count} enabled.", LogTextColor.Cyan);
+            logger.LogWithColor($"[ItemGen] Loaded {containerDefinitions.Count} container definition(s), {enabledContainers.Count} enabled.", LogTextColor.Cyan);
 
             // Register custom quest inventory items
             QuestInventoryItemGenerator.RegisterAll(customItemService, databaseService, enabledQuestItems, logger);
@@ -79,8 +82,11 @@ public class ItemGenPlugin(
             // Register custom keys
             KeyGenerator.RegisterAll(customItemService, databaseService, enabledKeys, logger);
 
+            // Register custom containers
+            ContainerGenerator.RegisterAll(customItemService, databaseService, enabledContainers, logger);
+
             logger.LogWithColor("[ItemGen] ====================================", LogTextColor.Cyan);
-            logger.LogWithColor($"[ItemGen] Done! Registered {enabledQuestItems.Count} custom quest item(s) and {enabledKeys.Count} custom key(s).", LogTextColor.Green);
+            logger.LogWithColor($"[ItemGen] Done! Registered {enabledQuestItems.Count} custom quest item(s), {enabledKeys.Count} custom key(s) and {enabledContainers.Count} custom container(s).", LogTextColor.Green);
             logger.LogWithColor("[ItemGen] ====================================", LogTextColor.Cyan);
         }
         catch (Exception ex)

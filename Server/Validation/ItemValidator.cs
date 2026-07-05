@@ -14,15 +14,17 @@ public static class ItemValidator
         if (string.IsNullOrWhiteSpace(pack.Name))
             errors.Add($"Pack '{fileName}': 'name' is required.");
 
-        if ((pack.QuestItems == null || pack.QuestItems.Count == 0) && (pack.Keys == null || pack.Keys.Count == 0))
+        var questList = pack.QuestItems ?? [];
+        var keyList = pack.Keys ?? [];
+        var containerList = pack.Containers ?? [];
+
+        if (questList.Count == 0 && keyList.Count == 0 && containerList.Count == 0)
         {
-            errors.Add($"Pack '{fileName}': at least one quest item or key entry is required.");
+            errors.Add($"Pack '{fileName}': at least one item entry is required.");
             return errors;
         }
 
         var seenIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        var questList = pack.QuestItems ?? [];
-        var keyList = pack.Keys ?? [];
 
         for (var i = 0; i < questList.Count; i++)
         {
@@ -66,6 +68,28 @@ public static class ItemValidator
                 if (string.IsNullOrWhiteSpace(doorId))
                     errors.Add($"{prefix}: 'doorIds' entries cannot be empty.");
             }
+        }
+
+        for (var i = 0; i < containerList.Count; i++)
+        {
+            var container = containerList[i];
+            var prefix = $"Container[{i}]";
+            ValidateItem(container, prefix, errors, seenIds);
+
+            if (container.Weight < 0)
+                errors.Add($"{prefix}: 'weight' cannot be negative.");
+
+            if (container.HandbookPriceRoubles < 0)
+                errors.Add($"{prefix}: 'handbookPriceRoubles' cannot be negative.");
+
+            if (container.FleaPriceRoubles < 0)
+                errors.Add($"{prefix}: 'fleaPriceRoubles' cannot be negative.");
+
+            if (string.IsNullOrWhiteSpace(container.Parent))
+                errors.Add($"{prefix}: 'parent' is required.");
+
+            if (string.IsNullOrWhiteSpace(container.HandbookParentId))
+                errors.Add($"{prefix}: 'handbookParentId' is required.");
         }
 
         return errors;

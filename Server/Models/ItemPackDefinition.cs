@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Text.Json;
 using System.Text.Json.Serialization;
 
 namespace ItemGen.Models;
@@ -16,6 +17,9 @@ public class ItemPackDefinition
 
     [JsonPropertyName("keys")]
     public List<KeyDefinition> Keys { get; set; } = [];
+
+    [JsonPropertyName("containers")]
+    public List<ContainerDefinition> Containers { get; set; } = [];
 }
 
 public class ItemDefinition
@@ -82,4 +86,19 @@ public class KeyDefinition : ItemDefinition
 
     [JsonPropertyName("doorIds")]
     public List<string> DoorIds { get; set; } = [];
+
+    [JsonPropertyName("properties")]
+    public JsonElement Properties { get; set; }
+}
+
+public class ContainerDefinition : ItemDefinition
+{
+    [JsonPropertyName("parent")]
+    public string Parent { get; set; } = string.Empty;
+
+    [JsonPropertyName("handbookParentId")]
+    public string HandbookParentId { get; set; } = string.Empty;
+
+    [JsonPropertyName("properties")]
+    public JsonElement Properties { get; set; }
 }
