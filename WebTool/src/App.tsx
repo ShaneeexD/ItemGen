@@ -644,9 +644,12 @@ export default function App() {
                         <input className="input-field" value={(selectedItem as KeyDefinition).keyCategory} onChange={e => updateItem(selectedIndex, { keyCategory: e.target.value })} />
                       </Field>
                     </div>
-                    <Field label="Door IDs (optional)" tooltip="Comma-separated vanilla door IDs this key should open. Used for future door binding; ItemGen does not patch doors yet." className="mt-4">
+                    <Field label="Door IDs (optional)" tooltip="Comma-separated vanilla door IDs this key opens. These are patched into the key's KeyIds on the server. Leave empty to inherit from the base template." className="mt-4">
                       <input className="input-field" placeholder="e.g. 123456789012345678901234, 567890123456789012345678" value={(selectedItem as KeyDefinition).doorIds.join(', ')} onChange={e => updateItem(selectedIndex, { doorIds: e.target.value.split(',').map(s => s.trim()).filter(Boolean) })} />
                     </Field>
+                    <div className="mt-3 text-sm text-tarkov-text-dim bg-tarkov-bg border border-tarkov-border rounded p-3">
+                      <span className="text-tarkov-accent font-semibold">Note:</span> Door IDs should be vanilla EFT door IDs. Custom doors added by mods such as Map Editor Lite can have the key ID set in the editor.
+                    </div>
                   </Section>
                 )}
 

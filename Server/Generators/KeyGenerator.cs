@@ -50,6 +50,7 @@ public static class KeyGenerator
             Weight = def.Weight,
             BackgroundColor = string.IsNullOrWhiteSpace(def.BackgroundColor) ? null : def.BackgroundColor,
             MaximumNumberOfUsage = def.Uses,
+            KeyIds = def.DoorIds.Count == 0 ? null : def.DoorIds,
             CanSellOnRagfair = def.CanSellOnRagfair,
             RarityPvE = def.RarityPvE,
         };
