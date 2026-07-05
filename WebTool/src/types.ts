@@ -59,7 +59,7 @@ export function createDefaultQuestItem(): QuestItemDefinition {
     handbookPriceRoubles: 0,
     fleaPriceRoubles: 0,
     rarityPvE: 'Not_exist',
-    canSellOnRagfair: true,
+    canSellOnRagfair: false,
     stackMaxSize: 1,
     questIds: [],
   }
