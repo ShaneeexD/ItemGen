@@ -48,7 +48,7 @@ public static class KeyGenerator
             ShortName = def.ShortName,
             Description = def.Description,
             Weight = def.Weight,
-            BackgroundColor = def.BackgroundColor,
+            BackgroundColor = string.IsNullOrWhiteSpace(def.BackgroundColor) ? null : def.BackgroundColor,
             MaximumNumberOfUsage = def.Uses,
             CanSellOnRagfair = def.CanSellOnRagfair,
             RarityPvE = def.RarityPvE,

@@ -43,9 +43,74 @@ import apiItemNames from '../api_item_names.json'
 type Tab = 'quest' | 'key'
 type RightPanel = 'editor' | 'json'
 
-const BACKGROUND_COLORS = ['yellow', 'blue', 'green', 'red', 'violet', 'black', 'grey', 'white']
 const RARITY_PVE = ['Not_exist', 'Common', 'Rare', 'Superrare', 'Legendary']
 const HEX24 = /^[0-9a-fA-F]{24}$/
+
+const SPT_COLOR_HEX: Record<string, string> = {
+  default: '#ffffff',
+  yellow: '#ffff00',
+  blue: '#0000ff',
+  green: '#00ff00',
+  red: '#ff0000',
+  violet: '#ee82ee',
+  black: '#000000',
+  grey: '#808080',
+  white: '#ffffff',
+  orange: '#ffa500',
+}
+
+const SPT_COLOR_NAMES = Object.keys(SPT_COLOR_HEX)
+
+function colorToHex(color: string): string {
+  const named = color.toLowerCase()
+  if (SPT_COLOR_HEX[named]) return SPT_COLOR_HEX[named]
+  if (/^#[0-9a-fA-F]{6}$/.test(color)) return color.toLowerCase()
+  return '#ffffff'
+}
+
+function BackgroundColorPicker({
+  value,
+  onChange,
+}: {
+  value?: string
+  onChange: (color: string) => void
+}) {
+  const hex = colorToHex(value || '')
+  const isDefault = !value || value === 'default'
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center gap-2">
+        <select
+          className="input-field flex-1"
+          value={!value || value === 'default' ? 'default' : SPT_COLOR_NAMES.includes(value.toLowerCase()) ? value.toLowerCase() : '__custom__'}
+          onChange={e => {
+            const color = e.target.value
+            if (color !== '__custom__') onChange(color)
+          }}
+        >
+          <option value="default">Default (use base template)</option>
+          {SPT_COLOR_NAMES.filter(c => c !== 'default').map(c => (
+            <option key={c} value={c}>
+              {c}
+            </option>
+          ))}
+          <option value="__custom__">Custom</option>
+        </select>
+        <input
+          type="color"
+          className="w-10 h-10 rounded cursor-pointer bg-transparent border-0 p-0 shrink-0"
+          value={hex}
+          onChange={e => onChange(e.target.value.toLowerCase())}
+        />
+      </div>
+      {isDefault && (
+        <div className="text-xs text-tarkov-text-dim">
+          The base template's background color will be kept.
+        </div>
+      )}
+    </div>
+  )
+}
 
 const ALL_ITEM_OPTIONS = Object.entries(apiItemNames as Record<string, { Name: string; ShortName: string }>)
   .map(([id, info]) => ({ value: id, label: info.Name, sub: `${info.ShortName} — ${id}` }))
@@ -528,10 +593,11 @@ export default function App() {
                     <Field label="Weight" tooltip="Item weight in kilograms. Affects player stamina and movement.">
                       <input className="input-field" type="number" step="0.01" value={selectedItem.weight} onChange={e => updateItem(selectedIndex, { weight: parseFloat(e.target.value) || 0 })} />
                     </Field>
-                    <Field label="Background Color" tooltip="Inventory cell background color. Matches the rarity/usefulness color of the base template.">
-                      <select className="input-field" value={selectedItem.backgroundColor} onChange={e => updateItem(selectedIndex, { backgroundColor: e.target.value })}>
-                        {BACKGROUND_COLORS.map(c => <option key={c} value={c}>{c}</option>)}
-                      </select>
+                    <Field label="Background Color" tooltip="Inventory cell background color. Choose 'Default' to keep the base template's color, pick a preset, or choose a custom hex color.">
+                      <BackgroundColorPicker
+                        value={selectedItem.backgroundColor}
+                        onChange={color => updateItem(selectedIndex, { backgroundColor: color === 'default' ? undefined : color })}
+                      />
                     </Field>
                     <Field label="Rarity PvE" tooltip="PvE rarity value used by SPT. 'Not_exist' hides the item from most loot pools; 'Common' is the default for keys.">
                       <select className="input-field" value={selectedItem.rarityPvE} onChange={e => updateItem(selectedIndex, { rarityPvE: e.target.value })}>
@@ -560,6 +626,9 @@ export default function App() {
                         <input className="input-field" type="number" min={1} value={(selectedItem as QuestItemDefinition).stackMaxSize} onChange={e => updateItem(selectedIndex, { stackMaxSize: parseInt(e.target.value) || 1 })} />
                       </Field>
                     </div>
+                    <Field label="Linked Quest IDs (optional)" tooltip="Comma-separated quest template IDs that use this item in a FindItem condition. Used by companion mods (e.g. TraderGen) to auto-generate quests." className="mt-4">
+                      <input className="input-field" placeholder="e.g. 5936da9e86f7742d65037edf, ..." value={(selectedItem as QuestItemDefinition).questIds.join(', ')} onChange={e => updateItem(selectedIndex, { questIds: e.target.value.split(',').map(s => s.trim()).filter(Boolean) })} />
+                    </Field>
                     <div className="mt-3 text-sm text-tarkov-text-dim bg-tarkov-bg border border-tarkov-border rounded p-3">
                       <span className="text-tarkov-accent font-semibold">Note:</span> The server sets <span className="font-mono">QuestItem = true</span> on this item so it behaves exactly like a vanilla EFT quest inventory item.
                     </div>

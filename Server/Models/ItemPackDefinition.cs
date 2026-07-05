@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Text.Json.Serialization;
 
 namespace ItemGen.Models;
@@ -41,7 +42,7 @@ public class ItemDefinition
     public double Weight { get; set; }
 
     [JsonPropertyName("backgroundColor")]
-    public string BackgroundColor { get; set; } = string.Empty;
+    public string? BackgroundColor { get; set; }
 
     [JsonPropertyName("handbookPriceRoubles")]
     public int HandbookPriceRoubles { get; set; }
@@ -66,6 +67,9 @@ public class QuestItemDefinition : ItemDefinition
 {
     [JsonPropertyName("stackMaxSize")]
     public int StackMaxSize { get; set; } = 1;
+
+    [JsonPropertyName("questIds")]
+    public List<string> QuestIds { get; set; } = [];
 }
 
 public class KeyDefinition : ItemDefinition

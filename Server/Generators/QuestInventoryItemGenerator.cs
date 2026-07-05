@@ -1,3 +1,5 @@
+using System.Collections.Generic;
+using System.Linq;
 using System.Reflection;
 using SPTarkov.Server.Core.Models.Common;
 using SPTarkov.Server.Core.Models.Eft.Common;
@@ -47,7 +49,7 @@ public static class QuestInventoryItemGenerator
             ShortName = def.ShortName,
             Description = def.Description,
             Weight = def.Weight,
-            BackgroundColor = def.BackgroundColor,
+            BackgroundColor = string.IsNullOrWhiteSpace(def.BackgroundColor) ? null : def.BackgroundColor,
             StackMaxSize = def.StackMaxSize,
             QuestItem = true,
             CanSellOnRagfair = def.CanSellOnRagfair,
@@ -79,12 +81,53 @@ public static class QuestInventoryItemGenerator
         if (result.Success == true)
         {
             logger.LogWithColor($"[ItemGen] Registered quest item: {def.Name} ({def.Id})", LogTextColor.Green);
+            ValidateLinkedQuests(def, databaseService, logger);
         }
         else
         {
             logger.LogWithColor(
                 $"[ItemGen] CreateItemFromClone reported failure for quest item '{def.Name}': {string.Join(", ", result.Errors ?? [])}",
                 LogTextColor.Yellow);
+        }
+    }
+
+    private static void ValidateLinkedQuests(
+        QuestItemDefinition def,
+        DatabaseService databaseService,
+        ISptLogger<ItemGenPlugin> logger)
+    {
+        if (def.QuestIds is null || def.QuestIds.Count == 0)
+        {
+            return;
+        }
+
+        var quests = databaseService.GetQuests();
+        foreach (var questId in def.QuestIds)
+        {
+            if (string.IsNullOrWhiteSpace(questId))
+            {
+                continue;
+            }
+
+            if (!quests.TryGetValue(questId, out var quest))
+            {
+                logger.LogWithColor(
+                    $"[ItemGen] Quest item '{def.Name}' references unknown quest '{questId}'. Make sure the quest is registered by a companion mod (e.g. TraderGen).",
+                    LogTextColor.Yellow);
+                continue;
+            }
+
+            var hasFindItem = quest.Conditions?.AvailableForFinish?.Any(c =>
+                c.ConditionType == "FindItem" &&
+                ((c.Target.IsList ? c.Target.List : [c.Target.Item])?.Contains(def.Id) ?? false)
+            ) ?? false;
+
+            if (!hasFindItem)
+            {
+                logger.LogWithColor(
+                    $"[ItemGen] Quest item '{def.Name}' is linked to quest '{questId}' but that quest does not have a FindItem condition targeting this item.",
+                    LogTextColor.Yellow);
+            }
         }
     }
 
