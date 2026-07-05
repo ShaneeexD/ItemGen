@@ -68,15 +68,11 @@ public static class KeyGenerator
         overrides.CanSellOnRagfair = def.CanSellOnRagfair;
         overrides.RarityPvE = def.RarityPvE;
 
-        // Do not override the model if no custom path is provided.
-        if (overrides.Prefab is { Path: "" or null })
-        {
-            overrides.Prefab = null;
-        }
-        if (overrides.UsePrefab is { Path: "" or null })
-        {
-            overrides.UsePrefab = null;
-        }
+        // Do not override the model via clone properties; custom bundle paths are injected after creation (see VPOAmmo pattern).
+        var customPrefabPath = GetPropertyPath(def.Properties, "Prefab");
+        var customUsePrefabPath = GetPropertyPath(def.Properties, "UsePrefab");
+        overrides.Prefab = null;
+        overrides.UsePrefab = null;
 
         var details = new NewItemFromCloneDetails
         {
@@ -103,6 +99,28 @@ public static class KeyGenerator
         if (result.Success == true)
         {
             logger.LogWithColor($"[ItemGen] Registered key: {def.Name} ({def.Id})", LogTextColor.Green);
+
+            if (!string.IsNullOrWhiteSpace(customPrefabPath) || !string.IsNullOrWhiteSpace(customUsePrefabPath))
+            {
+                var items = databaseService.GetItems();
+                if (items.TryGetValue(def.Id, out var tpl) && tpl.Properties != null)
+                {
+                    if (!string.IsNullOrWhiteSpace(customPrefabPath) && tpl.Properties.Prefab != null)
+                    {
+                        tpl.Properties.Prefab.Path = customPrefabPath;
+                    }
+                    if (!string.IsNullOrWhiteSpace(customUsePrefabPath) && tpl.Properties.UsePrefab != null)
+                    {
+                        tpl.Properties.UsePrefab.Path = customUsePrefabPath;
+                    }
+                }
+                else
+                {
+                    logger.LogWithColor(
+                        $"[ItemGen] Could not inject bundle path for key '{def.Name}' - item not found after clone.",
+                        LogTextColor.Yellow);
+                }
+            }
         }
         else
         {
@@ -110,6 +128,24 @@ public static class KeyGenerator
                 $"[ItemGen] CreateItemFromClone reported failure for key '{def.Name}': {string.Join(", ", result.Errors ?? [])}",
                 LogTextColor.Yellow);
         }
+    }
+
+    private static string? GetPropertyPath(JsonElement properties, string propertyName)
+    {
+        if (properties.ValueKind == JsonValueKind.Undefined || properties.ValueKind == JsonValueKind.Null)
+        {
+            return null;
+        }
+
+        if (properties.TryGetProperty(propertyName, out var prefab)
+            && prefab.ValueKind == JsonValueKind.Object
+            && prefab.TryGetProperty("path", out var path)
+            && path.ValueKind == JsonValueKind.String)
+        {
+            return path.GetString();
+        }
+
+        return null;
     }
 
     private static string ResolveParentId(DatabaseService databaseService, string baseTpl)
