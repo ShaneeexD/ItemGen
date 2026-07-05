@@ -906,7 +906,13 @@ function ContainerSpecifics({ container, onChange }: ContainerSpecificsProps) {
                   <input className="input-field" type="number" step="0.01" value={gProps.maxWeight ?? 0} onChange={e => updateGrid(i, { _props: { ...gProps, maxWeight: parseFloat(e.target.value) || 0 } })} />
                 </Field>
               </div>
-              <Field label="Allowed Item IDs (comma-separated)" className="mt-3">
+              <div className="flex items-center justify-between mt-3">
+                <span className="text-xs text-tarkov-text-dim">Allowed IDs</span>
+                <a className="text-xs text-tarkov-accent hover:underline flex items-center gap-1" href="https://db.sp-tarkov.com" target="_blank" rel="noopener noreferrer">
+                  Find IDs here
+                </a>
+              </div>
+              <Field label="Allowed Item IDs (comma-separated)" className="mt-1">
                 <input className="input-field" placeholder="e.g. 5448eb774bdc2d0a728b4567, ..." value={filter.join(', ')} onChange={e => {
                   const ids = e.target.value.split(',').map(s => s.trim()).filter(Boolean)
                   const nextFilters = [{ ...(gProps.filters?.[0] || {}), Filter: ids }]

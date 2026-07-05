@@ -151,6 +151,7 @@ export const ITEM_PARENT_NAMES: Record<string, string> = {
   '5a341c4086f77401f2541505': 'Headwear',
   '543be5dd4bdc2deb348b4569': 'Money',
   '6759673c76e93d8eb20b2080': 'Flyer',
+  '644120aa86ffbe10ee032b6f': 'ArmorPlate',
 }
 
 export const HANDBOOK_CATEGORY_NAMES: Record<string, string> = {
