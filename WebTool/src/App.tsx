@@ -30,14 +30,18 @@ import {
   QuestItemDefinition,
   KeyDefinition,
   ContainerDefinition,
+  TraderDefinition,
+  TraderItemEntry,
   ValidationError,
   createDefaultPack,
   createDefaultQuestItem,
   createDefaultKey,
   createDefaultContainer,
+  createDefaultTraderEntry,
   generateMongoId,
   getParentName,
   ITEM_PARENT_NAMES,
+  VANILLA_TRADERS,
 } from './types'
 import { QUEST_TEMPLATES } from './generated_quest_templates'
 import { KEY_TEMPLATES } from './generated_key_templates'
@@ -45,6 +49,7 @@ import { CONTAINER_TEMPLATES } from './generated_container_templates'
 import apiItemNames from '../api_item_names.json'
 
 type Tab = 'quest' | 'key' | 'container'
+type Mode = 'items' | 'traders'
 type RightPanel = 'editor' | 'json'
 
 const RARITY_PVE = ['Not_exist', 'Common', 'Rare', 'Superrare', 'Legendary']
@@ -175,6 +180,19 @@ function validatePack(pack: ItemPackDefinition): ValidationError[] {
     if (container.weight < 0) errors.push({ field: `${prefix}.weight`, message: 'Weight cannot be negative.' })
   })
 
+  pack.traders.forEach((trader, ti) => {
+    const tPrefix = `traders[${ti}]`
+    if (!HEX24.test(trader.traderId)) errors.push({ field: `${tPrefix}.traderId`, message: 'Trader ID must be 24 hex characters.' })
+    trader.entries.forEach((entry, ei) => {
+      const ePrefix = `${tPrefix}.entries[${ei}]`
+      if (!HEX24.test(entry.itemId)) errors.push({ field: `${ePrefix}.itemId`, message: 'Item ID must be 24 hex characters.' })
+      if (entry.priceRoubles < 0) errors.push({ field: `${ePrefix}.priceRoubles`, message: 'Price cannot be negative.' })
+      if (entry.loyaltyLevel < 1 || entry.loyaltyLevel > 4) errors.push({ field: `${ePrefix}.loyaltyLevel`, message: 'Loyalty level must be between 1 and 4.' })
+      if (entry.stockCount < 0) errors.push({ field: `${ePrefix}.stockCount`, message: 'Stock count cannot be negative.' })
+      if (entry.buyRestrictionMax < 0) errors.push({ field: `${ePrefix}.buyRestrictionMax`, message: 'Buy restriction cannot be negative.' })
+    })
+  })
+
   return errors
 }
 
@@ -268,10 +286,12 @@ function Sidebar({ open, onClose }: { open: boolean; onClose: () => void }) {
 
 export default function App() {
   const [pack, setPack] = useState<ItemPackDefinition>(createDefaultPack())
+  const [mode, setMode] = useState<Mode>('items')
   const [tab, setTab] = useState<Tab>('quest')
   const [selectedQuestIndex, setSelectedQuestIndex] = useState(0)
   const [selectedKeyIndex, setSelectedKeyIndex] = useState(0)
   const [selectedContainerIndex, setSelectedContainerIndex] = useState(0)
+  const [selectedTraderIndex, setSelectedTraderIndex] = useState(0)
   const [rightPanel, setRightPanel] = useState<RightPanel>('editor')
   const [copyFeedback, setCopyFeedback] = useState<string | null>(null)
   const [sidebarOpen, setSidebarOpen] = useState(false)
@@ -387,6 +407,9 @@ export default function App() {
         questItems: imported.questItems || [],
         keys: imported.keys || [],
         containers: imported.containers || [],
+        traders: imported.traders?.length
+          ? imported.traders
+          : VANILLA_TRADERS.map(t => ({ traderId: t.id, enabled: true, entries: [] })),
       }
       updatePack(normalized)
       setTab(normalized.questItems.length > 0 ? 'quest' : normalized.keys.length > 0 ? 'key' : 'container')
@@ -503,6 +526,21 @@ export default function App() {
         </div>
       </header>
 
+      <div className="bg-tarkov-surface border-b border-tarkov-border px-4 py-2 flex items-center gap-2">
+        <button
+          className={`px-4 py-1.5 rounded-lg text-sm font-medium transition-colors ${mode === 'items' ? 'bg-tarkov-accent text-tarkov-bg' : 'text-tarkov-text hover:bg-tarkov-border/50'}`}
+          onClick={() => setMode('items')}
+        >
+          Items
+        </button>
+        <button
+          className={`px-4 py-1.5 rounded-lg text-sm font-medium transition-colors ${mode === 'traders' ? 'bg-tarkov-accent text-tarkov-bg' : 'text-tarkov-text hover:bg-tarkov-border/50'}`}
+          onClick={() => setMode('traders')}
+        >
+          Traders
+        </button>
+      </div>
+
       <div className="flex-1 flex overflow-hidden">
         <aside className="w-72 bg-tarkov-surface border-r border-tarkov-border flex flex-col">
           <div className="p-4 border-b border-tarkov-border space-y-3">
@@ -512,55 +550,89 @@ export default function App() {
             <Toggle checked={pack.enabled} onChange={v => updatePack({ ...pack, enabled: v })} label="Pack Enabled" />
           </div>
 
-          <div className="p-3 border-b border-tarkov-border space-y-2">
-            <Field label="Category" tooltip="Select the item category to edit. New categories can be added easily as the mod grows.">
-              <select className="input-field" value={tab} onChange={e => setTab(e.target.value as Tab)}>
-                <option value="quest">Quest Items ({pack.questItems.length})</option>
-                <option value="key">Keys ({pack.keys.length})</option>
-                <option value="container">Containers ({pack.containers.length})</option>
-              </select>
-            </Field>
-            <button className="btn-primary w-full text-sm flex items-center justify-center gap-1.5" onClick={addItem}>
-              <Plus size={14} /> Add {tab === 'quest' ? 'Quest Item' : tab === 'key' ? 'Key' : 'Container'}
-            </button>
-          </div>
+          {mode === 'items' && (
+            <>
+              <div className="p-3 border-b border-tarkov-border space-y-2">
+                <Field label="Category" tooltip="Select the item category to edit. New categories can be added easily as the mod grows.">
+                  <select className="input-field" value={tab} onChange={e => setTab(e.target.value as Tab)}>
+                    <option value="quest">Quest Items ({pack.questItems.length})</option>
+                    <option value="key">Keys ({pack.keys.length})</option>
+                    <option value="container">Containers ({pack.containers.length})</option>
+                  </select>
+                </Field>
+                <button className="btn-primary w-full text-sm flex items-center justify-center gap-1.5" onClick={addItem}>
+                  <Plus size={14} /> Add {tab === 'quest' ? 'Quest Item' : tab === 'key' ? 'Key' : 'Container'}
+                </button>
+              </div>
 
-          <div ref={listRef} className="flex-1 overflow-y-auto p-2 space-y-2">
-            {activeItems.map((item, i) => {
-              const listPrefix = tab === 'quest' ? 'questItems' : tab === 'key' ? 'keys' : 'containers'
-              const hasErrors = validationErrors.some(e => e.field.startsWith(`${listPrefix}[${i}]`))
-              return (
-                <div
-                  key={item.id + i}
-                  className={`p-3 rounded border cursor-pointer text-sm transition-colors ${
-                    i === selectedIndex
-                      ? 'bg-tarkov-accent/10 border-tarkov-accent'
-                      : 'bg-tarkov-bg border-tarkov-border hover:border-tarkov-text-dim'
-                  } ${!item.enabled ? 'opacity-50' : ''}`}
-                  onClick={() => {
-                    if (tab === 'quest') setSelectedQuestIndex(i)
-                    else if (tab === 'key') setSelectedKeyIndex(i)
-                    else setSelectedContainerIndex(i)
-                  }}
-                >
-                  <div className="flex items-center justify-between">
-                    <span className="font-semibold truncate">{item.name}</span>
-                    {hasErrors && <AlertCircle size={14} className="text-tarkov-error shrink-0" />}
+              <div ref={listRef} className="flex-1 overflow-y-auto p-2 space-y-2">
+                {activeItems.map((item, i) => {
+                  const listPrefix = tab === 'quest' ? 'questItems' : tab === 'key' ? 'keys' : 'containers'
+                  const hasErrors = validationErrors.some(e => e.field.startsWith(`${listPrefix}[${i}]`))
+                  return (
+                    <div
+                      key={item.id + i}
+                      className={`p-3 rounded border cursor-pointer text-sm transition-colors ${
+                        i === selectedIndex
+                          ? 'bg-tarkov-accent/10 border-tarkov-accent'
+                          : 'bg-tarkov-bg border-tarkov-border hover:border-tarkov-text-dim'
+                      } ${!item.enabled ? 'opacity-50' : ''}`}
+                      onClick={() => {
+                        if (tab === 'quest') setSelectedQuestIndex(i)
+                        else if (tab === 'key') setSelectedKeyIndex(i)
+                        else setSelectedContainerIndex(i)
+                      }}
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="font-semibold truncate">{item.name}</span>
+                        {hasErrors && <AlertCircle size={14} className="text-tarkov-error shrink-0" />}
+                      </div>
+                      <div className="text-xs text-tarkov-text-dim font-mono truncate mt-1">{item.id}</div>
+                      <div className="text-xs text-tarkov-text-dim truncate">{item.baseTpl ? getTemplateName(item.baseTpl, tab) : 'No base template'}</div>
+                    </div>
+                  )
+                })}
+                {activeItems.length === 0 && (
+                  <div className="text-sm text-tarkov-text-dim text-center py-4">No {tab === 'quest' ? 'quest items' : tab === 'key' ? 'keys' : 'containers'} yet.</div>
+                )}
+              </div>
+
+              <div className="p-3 border-t border-tarkov-border space-y-2">
+                <button className="btn-primary w-full text-sm flex items-center justify-center gap-1.5" onClick={addItem}>
+                  <Plus size={14} /> Add {tab === 'quest' ? 'Quest Item' : tab === 'key' ? 'Key' : 'Container'}
+                </button>
+              </div>
+            </>
+          )}
+
+          {mode === 'traders' && (
+            <div className="flex-1 overflow-y-auto p-2 space-y-2">
+              <div className="text-xs font-semibold text-tarkov-text-dim uppercase tracking-wider px-2 mb-1">Traders</div>
+              {pack.traders.map((trader, i) => {
+                const name = VANILLA_TRADERS.find(t => t.id === trader.traderId)?.name || trader.traderId
+                const activeCount = trader.entries.filter(e => e.enabled).length
+                return (
+                  <div
+                    key={i}
+                    className={`p-3 rounded border cursor-pointer text-sm transition-colors ${
+                      i === selectedTraderIndex
+                        ? 'bg-tarkov-accent/10 border-tarkov-accent'
+                        : 'bg-tarkov-bg border-tarkov-border hover:border-tarkov-text-dim'
+                    } ${!trader.enabled ? 'opacity-50' : ''}`}
+                    onClick={() => setSelectedTraderIndex(i)}
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="font-semibold truncate">{name}</span>
+                      <span className="text-xs font-mono bg-tarkov-bg border border-tarkov-border px-1.5 py-0.5 rounded">{activeCount}</span>
+                    </div>
+                    <div className="text-xs text-tarkov-text-dim font-mono truncate mt-1">{trader.traderId}</div>
                   </div>
-                  <div className="text-xs text-tarkov-text-dim font-mono truncate mt-1">{item.id}</div>
-                  <div className="text-xs text-tarkov-text-dim truncate">{item.baseTpl ? getTemplateName(item.baseTpl, tab) : 'No base template'}</div>
-                </div>
-              )
-            })}
-            {activeItems.length === 0 && (
-              <div className="text-sm text-tarkov-text-dim text-center py-4">No {tab === 'quest' ? 'quest items' : tab === 'key' ? 'keys' : 'containers'} yet.</div>
-            )}
-          </div>
+                )
+              })}
+            </div>
+          )}
 
-          <div className="p-3 border-t border-tarkov-border space-y-2">
-            <button className="btn-primary w-full text-sm flex items-center justify-center gap-1.5" onClick={addItem}>
-              <Plus size={14} /> Add {tab === 'quest' ? 'Quest Item' : tab === 'key' ? 'Key' : 'Container'}
-            </button>
+          <div className="p-3 border-t border-tarkov-border">
             <button className="btn-secondary w-full text-sm flex items-center justify-center gap-1.5" onClick={() => { if (listRef.current) listRef.current.scrollTop = 0 }}>
               <ArrowUp size={14} /> Back to Top
             </button>
@@ -583,18 +655,19 @@ export default function App() {
           </div>
 
           <div className="flex-1 overflow-y-auto p-4">
-            {rightPanel === 'json' ? (
-              <section className="card">
-                <div className="flex items-center justify-between mb-3">
-                  <h2 className="text-lg font-semibold text-tarkov-accent flex items-center gap-2"><FileJson size={18} /> Generated Pack JSON</h2>
-                  <button className="btn-secondary text-sm flex items-center gap-1.5" onClick={copyJson}>
-                    <Copy size={14} /> {copyFeedback || 'Copy'}
-                  </button>
-                </div>
-                <pre className="bg-tarkov-bg border border-tarkov-border rounded p-3 overflow-auto text-xs font-mono max-h-[75vh]">{buildExportJson(pack)}</pre>
-              </section>
-            ) : selectedItem ? (
-              <div className="space-y-4 max-w-5xl">
+            {mode === 'items' ? (
+              rightPanel === 'json' ? (
+                <section className="card">
+                  <div className="flex items-center justify-between mb-3">
+                    <h2 className="text-lg font-semibold text-tarkov-accent flex items-center gap-2"><FileJson size={18} /> Generated Pack JSON</h2>
+                    <button className="btn-secondary text-sm flex items-center gap-1.5" onClick={copyJson}>
+                      <Copy size={14} /> {copyFeedback || 'Copy'}
+                    </button>
+                  </div>
+                  <pre className="bg-tarkov-bg border border-tarkov-border rounded p-3 overflow-auto text-xs font-mono max-h-[75vh]">{buildExportJson(pack)}</pre>
+                </section>
+              ) : selectedItem ? (
+                <div className="space-y-4 max-w-5xl">
                 <section className="card">
                   <div className="flex items-center justify-between flex-wrap gap-3">
                     <div className="flex items-center gap-3">
@@ -754,7 +827,14 @@ export default function App() {
               </div>
             ) : (
               <div className="text-center text-tarkov-text-dim mt-20">Select or add an item to edit.</div>
-            )}
+            )
+          ) : (
+            <TraderEditor
+              pack={pack}
+              traderIndex={selectedTraderIndex}
+              onChange={next => setPack({ ...pack, traders: next })}
+            />
+          )}
           </div>
         </main>
       </div>
@@ -803,6 +883,116 @@ function getParentDisplay(id: string, tab: Tab): string {
   const parentId = getTemplateParent(id, tab)
   if (!parentId) return ''
   return `(${getParentName(parentId)})`
+}
+
+function TraderEditor({ pack, traderIndex, onChange }: { pack: ItemPackDefinition; traderIndex: number; onChange: (traders: TraderDefinition[]) => void }) {
+  const trader = pack.traders[traderIndex]
+  if (!trader) {
+    return <div className="text-center text-tarkov-text-dim mt-20">Select a trader to edit.</div>
+  }
+
+  const updateTrader = (updates: Partial<TraderDefinition>) => {
+    const next = [...pack.traders]
+    next[traderIndex] = { ...next[traderIndex], ...updates }
+    onChange(next)
+  }
+
+  const updateEntry = (index: number, updates: Partial<TraderItemEntry>) => {
+    const next = [...trader.entries]
+    next[index] = { ...next[index], ...updates }
+    updateTrader({ entries: next })
+  }
+
+  const addEntry = () => {
+    const allItems = [...pack.questItems, ...pack.keys, ...pack.containers]
+    const itemId = allItems[0]?.id || ''
+    updateTrader({ entries: [...trader.entries, createDefaultTraderEntry(itemId)] })
+  }
+
+  const removeEntry = (index: number) => {
+    updateTrader({ entries: trader.entries.filter((_, i) => i !== index) })
+  }
+
+  const allItems = [...pack.questItems, ...pack.keys, ...pack.containers]
+  const itemOptions = allItems.map(item => ({
+    value: item.id,
+    label: `${item.name} (${item.shortName})`,
+    sub: item.id,
+  }))
+
+  return (
+    <div className="space-y-4 max-w-5xl">
+      <section className="card">
+        <div className="flex items-center justify-between flex-wrap gap-3">
+          <div className="flex items-center gap-3">
+            <Toggle checked={trader.enabled} onChange={v => updateTrader({ enabled: v })} />
+            <span className="font-semibold text-tarkov-accent text-lg">
+              {VANILLA_TRADERS.find(t => t.id === trader.traderId)?.name || trader.traderId}
+            </span>
+            <span className="text-xs text-tarkov-text-dim font-mono">{trader.traderId}</span>
+          </div>
+          <div className="text-sm text-tarkov-text-dim">{trader.entries.filter(e => e.enabled).length} of {trader.entries.length} entries enabled</div>
+        </div>
+      </section>
+
+      <Section title="Trader Entries" icon={<Package size={18} />}>
+        <div className="space-y-4">
+          {trader.entries.map((entry, i) => {
+            const item = allItems.find(item => item.id === entry.itemId)
+            return (
+              <div key={i} className="bg-tarkov-bg border border-tarkov-border rounded-lg p-4">
+                <div className="flex items-center justify-between mb-4">
+                  <Toggle checked={entry.enabled} onChange={v => updateEntry(i, { enabled: v })} label={`Entry ${i + 1}`} />
+                  <button className="btn-danger text-xs flex items-center gap-1" onClick={() => removeEntry(i)}>
+                    <Trash2 size={14} /> Remove
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                  <Field label="Item" tooltip="Custom item to sell at this trader.">
+                    <SearchableSelect
+                      value={entry.itemId}
+                      onChange={id => updateEntry(i, { itemId: id })}
+                      options={itemOptions}
+                      placeholder="Search item..."
+                    />
+                    {item && <div className="text-xs text-tarkov-text-dim font-mono mt-1">{item.id}</div>}
+                  </Field>
+                  <Field label="Price (₽)" tooltip="Price in roubles.">
+                    <input className="input-field" type="number" min={0} value={entry.priceRoubles} onChange={e => updateEntry(i, { priceRoubles: parseInt(e.target.value) || 0 })} />
+                  </Field>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                  <Field label="Loyalty Level" tooltip="Trader level required.">
+                    <input className="input-field" type="number" min={1} max={4} value={entry.loyaltyLevel} onChange={e => updateEntry(i, { loyaltyLevel: parseInt(e.target.value) || 1 })} />
+                  </Field>
+                  <Field label="Stock Count" tooltip="Amount available after restock.">
+                    <input className="input-field" type="number" min={0} disabled={entry.unlimitedStock} value={entry.stockCount} onChange={e => updateEntry(i, { stockCount: parseInt(e.target.value) || 0 })} />
+                  </Field>
+                  <Field label="Buy Restriction Max" tooltip="Max a player can buy per restock.">
+                    <input className="input-field" type="number" min={0} disabled={entry.unlimitedBuyRestriction} value={entry.buyRestrictionMax} onChange={e => updateEntry(i, { buyRestrictionMax: parseInt(e.target.value) || 0 })} />
+                  </Field>
+                  <div className="flex flex-col gap-2 justify-end">
+                    <Toggle checked={entry.unlimitedStock} onChange={v => updateEntry(i, { unlimitedStock: v })} label="Unlimited stock" />
+                    <Toggle checked={entry.unlimitedBuyRestriction} onChange={v => updateEntry(i, { unlimitedBuyRestriction: v })} label="Unlimited buy restriction" />
+                  </div>
+                </div>
+              </div>
+            )
+          })}
+
+          {trader.entries.length === 0 && (
+            <div className="text-sm text-tarkov-text-dim text-center py-4">No entries yet. Add one to sell a custom item at this trader.</div>
+          )}
+
+          <button className="btn-secondary flex items-center gap-1.5" onClick={addEntry}>
+            <Plus size={14} /> Add Entry
+          </button>
+        </div>
+      </Section>
+    </div>
+  )
 }
 
 function FilterIdChips({ ids }: { ids: string[] }) {

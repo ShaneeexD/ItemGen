@@ -85,6 +85,9 @@ public class ItemGenPlugin(
             // Register custom containers
             ContainerGenerator.RegisterAll(customItemService, databaseService, enabledContainers, logger);
 
+            // Add custom items to trader assorts
+            TraderGenerator.RegisterAll(databaseService, packs.Select(p => p.Definition), logger);
+
             logger.LogWithColor("[ItemGen] ====================================", LogTextColor.Cyan);
             logger.LogWithColor($"[ItemGen] Done! Registered {enabledQuestItems.Count} custom quest item(s), {enabledKeys.Count} custom key(s) and {enabledContainers.Count} custom container(s).", LogTextColor.Green);
             logger.LogWithColor("[ItemGen] ====================================", LogTextColor.Cyan);

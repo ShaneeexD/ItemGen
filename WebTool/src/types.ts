@@ -4,6 +4,7 @@ export interface ItemPackDefinition {
   questItems: QuestItemDefinition[]
   keys: KeyDefinition[]
   containers: ContainerDefinition[]
+  traders: TraderDefinition[]
 }
 
 export interface ItemDefinition {
@@ -39,6 +40,23 @@ export interface ContainerDefinition extends ItemDefinition {
   parent: string
   handbookParentId: string
   properties: Record<string, any>
+}
+
+export interface TraderItemEntry {
+  itemId: string
+  enabled: boolean
+  priceRoubles: number
+  loyaltyLevel: number
+  stockCount: number
+  buyRestrictionMax: number
+  unlimitedStock: boolean
+  unlimitedBuyRestriction: boolean
+}
+
+export interface TraderDefinition {
+  traderId: string
+  enabled: boolean
+  entries: TraderItemEntry[]
 }
 
 export interface ValidationError {
@@ -154,6 +172,21 @@ export const ITEM_PARENT_NAMES: Record<string, string> = {
   '644120aa86ffbe10ee032b6f': 'ArmorPlate',
 }
 
+export const VANILLA_TRADERS = [
+  { id: '54cb50c76803fa8b248b4571', name: 'Prapor' },
+  { id: '54cb57776803fa99248b456e', name: 'Therapist' },
+  { id: '58330581ace78e27b8b10cee', name: 'Skier' },
+  { id: '5935c25fb3acc3127c3d8cd9', name: 'Peacekeeper' },
+  { id: '579dc571d53a0658a154fbec', name: 'Fence' },
+  { id: '5a7c2eca46aef81a7ca2145d', name: 'Mechanic' },
+  { id: '5ac3b934156ae10c4430e83c', name: 'Ragman' },
+  { id: '5c0647fdd443bc2504c2d371', name: 'Jaeger' },
+  { id: '638f541a29ffd1183d187f57', name: 'Caretaker' },
+  { id: '656f0f98d80a697f855d34b1', name: 'BTR' },
+  { id: '6617beeaa9cfa777ca915b7c', name: 'Arena' },
+  { id: '6864e812f9fe664cb8b8e152', name: 'Storyteller' },
+]
+
 export const HANDBOOK_CATEGORY_NAMES: Record<string, string> = {
   '5b47574386f77428ca22b33f': 'Quest Items / Keys',
   '5b47574386f77428ca22b33e': 'Barter Items',
@@ -174,6 +207,27 @@ export function getHandbookCategoryName(categoryId: string): string {
   return HANDBOOK_CATEGORY_NAMES[categoryId] || categoryId
 }
 
+export function createDefaultTraderEntry(itemId: string = ''): TraderItemEntry {
+  return {
+    itemId,
+    enabled: true,
+    priceRoubles: 0,
+    loyaltyLevel: 1,
+    stockCount: 200,
+    buyRestrictionMax: 200,
+    unlimitedStock: false,
+    unlimitedBuyRestriction: false,
+  }
+}
+
+export function createDefaultTraderDefinition(traderId: string = VANILLA_TRADERS[0].id): TraderDefinition {
+  return {
+    traderId,
+    enabled: true,
+    entries: [],
+  }
+}
+
 export function createDefaultPack(): ItemPackDefinition {
   return {
     enabled: true,
@@ -181,5 +235,6 @@ export function createDefaultPack(): ItemPackDefinition {
     questItems: [],
     keys: [],
     containers: [],
+    traders: VANILLA_TRADERS.map(t => createDefaultTraderDefinition(t.id)),
   }
 }

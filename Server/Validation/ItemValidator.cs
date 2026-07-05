@@ -92,6 +92,37 @@ public static class ItemValidator
                 errors.Add($"{prefix}: 'handbookParentId' is required.");
         }
 
+        var traderList = pack.Traders ?? [];
+        for (var i = 0; i < traderList.Count; i++)
+        {
+            var trader = traderList[i];
+            var tPrefix = $"Trader[{i}]";
+
+            if (string.IsNullOrWhiteSpace(trader.TraderId) || !Hex24.IsMatch(trader.TraderId))
+                errors.Add($"{tPrefix}: 'traderId' must be a 24-character hex string.");
+
+            for (var j = 0; j < trader.Entries.Count; j++)
+            {
+                var entry = trader.Entries[j];
+                var ePrefix = $"{tPrefix}.Entry[{j}]";
+
+                if (string.IsNullOrWhiteSpace(entry.ItemId) || !Hex24.IsMatch(entry.ItemId))
+                    errors.Add($"{ePrefix}: 'itemId' must be a 24-character hex string.");
+
+                if (entry.PriceRoubles < 0)
+                    errors.Add($"{ePrefix}: 'priceRoubles' cannot be negative.");
+
+                if (entry.LoyaltyLevel < 1 || entry.LoyaltyLevel > 4)
+                    errors.Add($"{ePrefix}: 'loyaltyLevel' must be between 1 and 4.");
+
+                if (entry.StockCount < 0)
+                    errors.Add($"{ePrefix}: 'stockCount' cannot be negative.");
+
+                if (entry.BuyRestrictionMax < 0)
+                    errors.Add($"{ePrefix}: 'buyRestrictionMax' cannot be negative.");
+            }
+        }
+
         return errors;
     }
 

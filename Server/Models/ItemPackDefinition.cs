@@ -20,6 +20,48 @@ public class ItemPackDefinition
 
     [JsonPropertyName("containers")]
     public List<ContainerDefinition> Containers { get; set; } = [];
+
+    [JsonPropertyName("traders")]
+    public List<TraderDefinition> Traders { get; set; } = [];
+}
+
+public class TraderItemEntry
+{
+    [JsonPropertyName("itemId")]
+    public string ItemId { get; set; } = string.Empty;
+
+    [JsonPropertyName("enabled")]
+    public bool Enabled { get; set; } = true;
+
+    [JsonPropertyName("priceRoubles")]
+    public int PriceRoubles { get; set; }
+
+    [JsonPropertyName("loyaltyLevel")]
+    public int LoyaltyLevel { get; set; } = 1;
+
+    [JsonPropertyName("stockCount")]
+    public int StockCount { get; set; } = 200;
+
+    [JsonPropertyName("buyRestrictionMax")]
+    public int BuyRestrictionMax { get; set; } = 200;
+
+    [JsonPropertyName("unlimitedStock")]
+    public bool UnlimitedStock { get; set; }
+
+    [JsonPropertyName("unlimitedBuyRestriction")]
+    public bool UnlimitedBuyRestriction { get; set; }
+}
+
+public class TraderDefinition
+{
+    [JsonPropertyName("traderId")]
+    public string TraderId { get; set; } = string.Empty;
+
+    [JsonPropertyName("enabled")]
+    public bool Enabled { get; set; } = true;
+
+    [JsonPropertyName("entries")]
+    public List<TraderItemEntry> Entries { get; set; } = [];
 }
 
 public class ItemDefinition
