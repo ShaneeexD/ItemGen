@@ -193,8 +193,6 @@ public static class StimGenerator
                 tpl.Properties.FoodEffectType = null;
             }
 
-            var propsJson = tpl?.Properties != null ? JsonSerializer.Serialize(tpl.Properties) : "null";
-            logger.LogWithColor($"[ItemGen] Patched stimulator buff set '{buffSetKey}' with {buffs.Count} buff(s) for '{def.Name}' (StimulatorBuffs={tpl?.Properties?.StimulatorBuffs}). Properties JSON: {propsJson}", LogTextColor.Green);
         }
         catch (Exception ex)
         {

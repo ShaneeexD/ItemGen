@@ -38,7 +38,7 @@ public class ItemGenPlugin(
     public Task OnLoad()
     {
         logger.LogWithColor("[ItemGen] ====================================", LogTextColor.Cyan);
-        logger.LogWithColor("[ItemGen] ItemGen Framework v1.0.0 loading...", LogTextColor.Cyan);
+        logger.LogWithColor("[ItemGen] ItemGen Framework v{new ModMetadata().Version} loading...", LogTextColor.Cyan);
         logger.LogWithColor("[ItemGen] ====================================", LogTextColor.Cyan);
 
         var configPath = Path.Combine(Directory.GetCurrentDirectory(), "user", "mods", "ItemGen", "config", "config.json");
