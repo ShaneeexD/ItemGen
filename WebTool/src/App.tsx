@@ -57,7 +57,7 @@ import { STIM_TEMPLATES } from './generated_stim_templates'
 import apiItemNames from '../api_item_names.json'
 
 type Tab = 'quest' | 'key' | 'container' | 'stim'
-type Mode = 'items' | 'traders'
+type Mode = 'items' | 'traders' | 'bundles'
 type RightPanel = 'editor' | 'json'
 
 const RARITY_PVE = ['Not_exist', 'Common', 'Rare', 'Superrare', 'Legendary']
@@ -249,6 +249,7 @@ function cleanProperties(props: Record<string, any>, allowed: string[], defaults
 function buildExportJson(pack: ItemPackDefinition): string {
   const cleaned: ItemPackDefinition = {
     ...pack,
+    bundles: undefined,
     keys: pack.keys.map(k => ({
       ...k,
       properties: cleanProperties(k.properties || {}, ['Prefab', 'UsePrefab']),
@@ -274,6 +275,12 @@ async function exportModZip(pack: ItemPackDefinition) {
   const zip = new JSZip()
   const packName = pack.name.toLowerCase().replace(/\s+/g, '-')
   zip.file(`SPT/user/mods/ItemGen/items/${packName}.json`, buildExportJson(pack))
+
+  if (pack.bundles && pack.bundles.length > 0) {
+    pack.bundles.forEach(bundle => {
+      zip.file(`BepInEx/plugins/Serenity-ItemGen/bundles/${bundle.name}`, bundle.data)
+    })
+  }
 
   const blob = await zip.generateAsync({ type: 'blob' })
   saveAs(blob, `${packName}.zip`)
@@ -363,6 +370,7 @@ export default function App() {
   const [copyFeedback, setCopyFeedback] = useState<string | null>(null)
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const bundleInputRef = useRef<HTMLInputElement>(null)
   const listRef = useRef<HTMLDivElement>(null)
 
   const activeItems = useMemo(() => {
@@ -483,6 +491,7 @@ export default function App() {
   const importPack = useCallback(async (file: File) => {
     try {
       let raw = ''
+      let importedBundles: { name: string; data: ArrayBuffer }[] = []
 
       if (file.name.toLowerCase().endsWith('.zip')) {
         const zip = await JSZip.loadAsync(file)
@@ -495,6 +504,16 @@ export default function App() {
           return
         }
         raw = await packFile.async('text')
+
+        const bundlePrefix = 'BepInEx/plugins/Serenity-ItemGen/bundles/'
+        importedBundles = await Promise.all(
+          Object.values(zip.files)
+            .filter(f => !f.dir && f.name.toLowerCase().startsWith(bundlePrefix.toLowerCase()))
+            .map(async f => ({
+              name: f.name.slice(bundlePrefix.length),
+              data: await f.async('arraybuffer'),
+            }))
+        )
       } else {
         raw = await file.text()
       }
@@ -510,6 +529,7 @@ export default function App() {
         traders: imported.traders?.length
           ? imported.traders
           : VANILLA_TRADERS.map(t => ({ traderId: t.id, enabled: true, entries: [] })),
+        bundles: importedBundles.length > 0 ? importedBundles : imported.bundles || [],
       }
       updatePack(normalized)
       setTab(normalized.questItems.length > 0 ? 'quest' : normalized.keys.length > 0 ? 'key' : normalized.stims.length > 0 ? 'stim' : 'container')
@@ -520,6 +540,23 @@ export default function App() {
       alert('Invalid pack file: ' + (e as Error).message)
     }
   }, [updatePack])
+
+  const addBundles = useCallback(async (files: FileList | null) => {
+    if (!files || files.length === 0) return
+    const newBundles = await Promise.all(
+      Array.from(files).map(async file => ({
+        name: file.name,
+        data: await file.arrayBuffer(),
+      }))
+    )
+    updatePack({ ...pack, bundles: [...(pack.bundles || []), ...newBundles] })
+  }, [pack, updatePack])
+
+  const removeBundle = useCallback((index: number) => {
+    const next = [...(pack.bundles || [])]
+    next.splice(index, 1)
+    updatePack({ ...pack, bundles: next })
+  }, [pack, updatePack])
 
   const exportJson = useCallback(() => downloadJson(pack), [pack])
   const exportPackage = useCallback(() => exportModZip(pack), [pack])
@@ -546,7 +583,6 @@ export default function App() {
         ...(template ? {
           weight: template.weight,
           backgroundColor: template.backgroundColor,
-          customModel: template.prefab,
           stackMaxSize: template.stackMaxSize,
         } : {}),
       })
@@ -557,7 +593,6 @@ export default function App() {
         ...(template ? {
           weight: template.weight,
           backgroundColor: template.backgroundColor,
-          customModel: template.prefab,
           uses: template.maximumNumberOfUsage,
           properties: template.properties,
         } : {}),
@@ -570,7 +605,6 @@ export default function App() {
         ...baseUpdates,
         weight: template?.weight ?? (typeof props.Weight === 'number' ? props.Weight : 0.05),
         backgroundColor: template?.backgroundColor ?? props.BackgroundColor,
-        customModel: undefined,
         rarityPvE: props.RarityPvE ?? 'Superrare',
         canSellOnRagfair: props.CanSellOnRagfair ?? true,
         itemSound: template?.itemSound ?? props.ItemSound ?? 'med_stimulator',
@@ -661,6 +695,12 @@ export default function App() {
           onClick={() => setMode('traders')}
         >
           Traders
+        </button>
+        <button
+          className={`px-4 py-1.5 rounded-lg text-sm font-medium transition-colors ${mode === 'bundles' ? 'bg-tarkov-accent text-tarkov-bg' : 'text-tarkov-text hover:bg-tarkov-border/50'}`}
+          onClick={() => setMode('bundles')}
+        >
+          Bundles {pack.bundles && pack.bundles.length > 0 && `(${pack.bundles.length})`}
         </button>
       </div>
 
@@ -916,11 +956,11 @@ export default function App() {
                           updateItem(selectedIndex, { properties: { ...key.properties, ItemSound: e.target.value } })
                         }} />
                       </Field>
-                      <Field label="Prefab Path" tooltip="3D model bundle path. Leave empty to inherit from the base template.">
+                      <Field label="Custom Model" tooltip="Custom bundle filename (e.g. my_key.bundle). The client plugin matches this to a file in BepInEx\plugins\Serenity-ItemGen\bundles. Leave empty to inherit from the base template.">
                         <input className="input-field" value={(selectedItem as KeyDefinition).properties.Prefab?.path ?? ''} onChange={e => {
                           const key = selectedItem as KeyDefinition
                           updateItem(selectedIndex, { properties: { ...key.properties, Prefab: { ...key.properties.Prefab, path: e.target.value } } })
-                        }} placeholder="assets/content/items/..." />
+                        }} placeholder="my_key.bundle" />
                       </Field>
                     </div>
                     <Field label="Door IDs (optional)" tooltip="Comma-separated vanilla door IDs this key opens. These are patched into the key's KeyIds on the server. Leave empty to inherit from the base template." className="mt-4">
@@ -947,25 +987,61 @@ export default function App() {
                 )}
 
                 <Section title="Advanced" icon={<Settings size={18} />}>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <Field label="Custom Icon Path (optional)" tooltip="Override the default icon. Path is relative to the mod bundle. Leave empty to inherit from the base template.">
-                      <input className="input-field" value={selectedItem.customIcon || ''} onChange={e => updateItem(selectedIndex, { customIcon: e.target.value || undefined })} placeholder="assets/content/items/..." />
-                    </Field>
-                    <Field label="Custom Model Path (optional)" tooltip="Override the 3D model. Leave empty to inherit from the base template.">
-                      <input className="input-field" value={selectedItem.customModel || ''} onChange={e => updateItem(selectedIndex, { customModel: e.target.value || undefined })} placeholder="assets/content/items/..." />
-                    </Field>
-                  </div>
+                  <Field label="Custom Icon Path (optional)" tooltip="Override the default icon. Path is relative to the mod bundle. Leave empty to inherit from the base template.">
+                    <input className="input-field" value={selectedItem.customIcon || ''} onChange={e => updateItem(selectedIndex, { customIcon: e.target.value || undefined })} placeholder="assets/content/items/..." />
+                  </Field>
                 </Section>
               </div>
             ) : (
               <div className="text-center text-tarkov-text-dim mt-20">Select or add an item to edit.</div>
             )
-          ) : (
+          ) : mode === 'traders' ? (
             <TraderEditor
               pack={pack}
               traderIndex={selectedTraderIndex}
               onChange={next => setPack({ ...pack, traders: next })}
             />
+          ) : (
+            <div className="space-y-4 max-w-5xl">
+              <Section title="Custom Bundles" icon={<Upload size={18} />}>
+                <input
+                  type="file"
+                  multiple
+                  ref={bundleInputRef}
+                  className="hidden"
+                  onChange={e => addBundles(e.target.files)}
+                />
+                <div
+                  className="border border-dashed border-tarkov-border rounded-lg p-6 text-center hover:border-tarkov-accent hover:bg-tarkov-accent/5 transition-colors cursor-pointer"
+                  onClick={() => bundleInputRef.current?.click()}
+                  onDragOver={e => { e.preventDefault(); e.dataTransfer.dropEffect = 'copy' }}
+                  onDrop={e => { e.preventDefault(); addBundles(e.dataTransfer.files) }}
+                >
+                  <Upload size={24} className="mx-auto text-tarkov-text-dim mb-2" />
+                  <div className="text-sm text-tarkov-text">Drop bundle files here or click to browse</div>
+                  <div className="text-xs text-tarkov-text-dim mt-1">Files will be bundled into the exported ZIP under BepInEx/plugins/Serenity-ItemGen/bundles/</div>
+                </div>
+                {(pack.bundles || []).length > 0 && (
+                  <div className="mt-4 space-y-2">
+                    <h3 className="text-sm font-semibold text-tarkov-text">Added Bundles</h3>
+                    <div className="space-y-1">
+                      {(pack.bundles || []).map((bundle, i) => (
+                        <div key={`${bundle.name}-${i}`} className="flex items-center justify-between px-3 py-2 bg-tarkov-bg border border-tarkov-border rounded text-sm">
+                          <span className="truncate text-tarkov-text">{bundle.name}</span>
+                          <button
+                            className="text-tarkov-error hover:text-tarkov-error/80 shrink-0 ml-2"
+                            onClick={() => removeBundle(i)}
+                            aria-label="Remove bundle"
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </Section>
+            </div>
           )}
           </div>
         </main>
@@ -1324,11 +1400,11 @@ function StimSpecifics({ stim, onChange }: StimSpecificsProps) {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
-        <Field label="Prefab Path" tooltip="3D model bundle path for the loot item. Leave empty to inherit from the base template.">
-          <input className="input-field" value={props.Prefab?.path ?? ''} onChange={e => updateProp('Prefab', { ...props.Prefab, path: e.target.value })} placeholder="assets/content/weapons/usable_items/..." />
+        <Field label="Custom Model" tooltip="Custom bundle filename for the loot/inventory model (e.g. my_stim.bundle). The client plugin matches this to a file in BepInEx\plugins\Serenity-ItemGen\bundles. Leave empty to inherit from the base template.">
+          <input className="input-field" value={props.Prefab?.path ?? ''} onChange={e => updateProp('Prefab', { ...props.Prefab, path: e.target.value })} placeholder="my_stim.bundle" />
         </Field>
-        <Field label="Use Prefab Path" tooltip="3D model bundle path for the in-hand/use item. Leave empty to inherit from the base template.">
-          <input className="input-field" value={props.UsePrefab?.path ?? ''} onChange={e => updateProp('UsePrefab', { ...props.UsePrefab, path: e.target.value })} placeholder="assets/content/weapons/usable_items/..." />
+        <Field label="Use Model" tooltip="Custom bundle filename for the in-hand/use animation model. Usually the same as Custom Model unless you have a separate injector animation. Leave empty to inherit from the base template.">
+          <input className="input-field" value={props.UsePrefab?.path ?? ''} onChange={e => updateProp('UsePrefab', { ...props.UsePrefab, path: e.target.value })} placeholder="my_stim.bundle" />
         </Field>
       </div>
 
@@ -1432,11 +1508,11 @@ function ContainerSpecifics({ container, onChange }: ContainerSpecificsProps) {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
-        <Field label="Prefab Path" tooltip="3D model bundle path. Leave empty to inherit from the base template.">
-          <input className="input-field" value={props.Prefab?.path ?? ''} onChange={e => updateProp('Prefab', { ...props.Prefab, path: e.target.value })} placeholder="assets/content/items/..." />
+        <Field label="Custom Model" tooltip="Custom bundle filename for the loot/inventory model (e.g. my_container.bundle). The client plugin matches this to a file in BepInEx\plugins\Serenity-ItemGen\bundles. Leave empty to inherit from the base template.">
+          <input className="input-field" value={props.Prefab?.path ?? ''} onChange={e => updateProp('Prefab', { ...props.Prefab, path: e.target.value })} placeholder="my_container.bundle" />
         </Field>
-        <Field label="Use Prefab Path" tooltip="In-raid interaction model bundle path. Leave empty to inherit from the base template.">
-          <input className="input-field" value={props.UsePrefab?.path ?? ''} onChange={e => updateProp('UsePrefab', { ...props.UsePrefab, path: e.target.value })} placeholder="assets/content/items/..." />
+        <Field label="Use Model" tooltip="Custom bundle filename for the in-hand/interaction model. Leave empty to inherit from the base template.">
+          <input className="input-field" value={props.UsePrefab?.path ?? ''} onChange={e => updateProp('UsePrefab', { ...props.UsePrefab, path: e.target.value })} placeholder="my_container.bundle" />
         </Field>
       </div>
 

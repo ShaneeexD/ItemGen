@@ -63,49 +63,63 @@ namespace ItemGen.Client
             var assetPaths = CollectAssetPathsFromItemPacks();
             if (assetPaths.Count == 0)
             {
-                _log?.LogInfo("No prefab paths found in ItemGen item packs; custom bundles will only be loaded by manifest.");
+                _log?.LogInfo("No prefab paths found in ItemGen item packs; bundles will be auto-loaded by filename.");
             }
 
-            string[] bundleFiles = Directory.GetFiles(bundlesDir, "*.bundle", SearchOption.AllDirectories);
-            foreach (string filePath in bundleFiles)
-            {
-                string fileName = Path.GetFileName(filePath);
-                string matchingPath = assetPaths.FirstOrDefault(p =>
-                    string.Equals(Path.GetFileName(p), fileName, StringComparison.OrdinalIgnoreCase));
-
-                if (!string.IsNullOrEmpty(matchingPath))
-                {
-                    _bundleFileByAssetPath[matchingPath] = filePath;
-                    _log?.LogInfo($"Discovered custom bundle: {fileName} -> {matchingPath}");
-                }
-                else
-                {
-                    _log?.LogWarning($"Bundle file {fileName} does not match any prefab path in ItemGen item packs; add it to bundles.json to load it.");
-                }
-            }
-
-            // Also load explicit manifest entries for bundles not matched by prefab paths
+            // Pre-load manifest for explicit overrides
             string manifestPath = Path.Combine(pluginDir, "bundles.json");
+            var manifestEntries = new List<BundleManifestEntry>();
             if (File.Exists(manifestPath))
             {
                 try
                 {
                     string json = File.ReadAllText(manifestPath);
-                    var entries = JsonConvert.DeserializeObject<List<BundleManifestEntry>>(json) ?? new List<BundleManifestEntry>();
-                    foreach (var entry in entries)
-                    {
-                        if (string.IsNullOrWhiteSpace(entry.FileName) || string.IsNullOrWhiteSpace(entry.AssetPath))
-                            continue;
-
-                        string filePath = Path.Combine(bundlesDir, entry.FileName);
-                        if (File.Exists(filePath))
-                            _bundleFileByAssetPath[entry.AssetPath] = filePath;
-                    }
+                    manifestEntries = JsonConvert.DeserializeObject<List<BundleManifestEntry>>(json) ?? new List<BundleManifestEntry>();
                 }
                 catch (Exception ex)
                 {
                     _log?.LogError($"Failed to read bundles.json: {ex}");
                 }
+            }
+
+            // Discover every file in the bundles folder. Manifest overrides take precedence,
+            // then item-pack prefab path matches, then the filename itself is used as the asset path.
+            string[] bundleFiles = Directory.GetFiles(bundlesDir, "*.*", SearchOption.AllDirectories);
+            foreach (string filePath in bundleFiles)
+            {
+                string fileName = Path.GetFileName(filePath);
+                string fileNameNoExt = Path.GetFileNameWithoutExtension(filePath);
+
+                // Skip the manifest itself
+                if (string.Equals(fileName, "bundles.json", StringComparison.OrdinalIgnoreCase))
+                    continue;
+
+                // Manifest override
+                var manifestEntry = manifestEntries.FirstOrDefault(e =>
+                    string.Equals(e.FileName, fileName, StringComparison.OrdinalIgnoreCase) ||
+                    string.Equals(e.FileName, fileNameNoExt, StringComparison.OrdinalIgnoreCase));
+                if (manifestEntry != null)
+                {
+                    _bundleFileByAssetPath[manifestEntry.AssetPath] = filePath;
+                    _log?.LogInfo($"Manifest bundle: {fileName} -> {manifestEntry.AssetPath}");
+                    continue;
+                }
+
+                // Match against prefab paths found in ItemGen item packs
+                string matchingPath = assetPaths.FirstOrDefault(p =>
+                    string.Equals(Path.GetFileName(p), fileName, StringComparison.OrdinalIgnoreCase) ||
+                    string.Equals(Path.GetFileNameWithoutExtension(p), fileNameNoExt, StringComparison.OrdinalIgnoreCase));
+
+                if (!string.IsNullOrEmpty(matchingPath))
+                {
+                    _bundleFileByAssetPath[matchingPath] = filePath;
+                    _log?.LogInfo($"Discovered custom bundle: {fileName} -> {matchingPath}");
+                    continue;
+                }
+
+                // Fall back to auto-load by filename
+                _bundleFileByAssetPath[fileName] = filePath;
+                _log?.LogInfo($"Auto-loaded bundle: {fileName} -> {fileName}");
             }
         }
 
@@ -163,8 +177,7 @@ namespace ItemGen.Client
                 foreach (var prop in obj.Properties())
                 {
                     if ((prop.Name == "path" || prop.Name == "Prefab" || prop.Name == "UsePrefab" || prop.Name == "customModel")
-                        && prop.Value?.Type == JTokenType.String
-                        && prop.Value.ToString().EndsWith(".bundle", StringComparison.OrdinalIgnoreCase))
+                        && prop.Value?.Type == JTokenType.String)
                     {
                         paths.Add(prop.Value.ToString());
                     }

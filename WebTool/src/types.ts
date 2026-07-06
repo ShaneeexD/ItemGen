@@ -1,3 +1,8 @@
+export interface BundleFile {
+  name: string
+  data: ArrayBuffer
+}
+
 export interface ItemPackDefinition {
   enabled: boolean
   name: string
@@ -6,6 +11,7 @@ export interface ItemPackDefinition {
   containers: ContainerDefinition[]
   stims: StimDefinition[]
   traders: TraderDefinition[]
+  bundles?: BundleFile[]
 }
 
 export interface ItemDefinition {
@@ -22,7 +28,6 @@ export interface ItemDefinition {
   rarityPvE: string
   canSellOnRagfair: boolean
   customIcon?: string
-  customModel?: string
 }
 
 export interface QuestItemDefinition extends ItemDefinition {
@@ -305,5 +310,6 @@ export function createDefaultPack(): ItemPackDefinition {
     containers: [],
     stims: [],
     traders: VANILLA_TRADERS.map(t => createDefaultTraderDefinition(t.id)),
+    bundles: [],
   }
 }
