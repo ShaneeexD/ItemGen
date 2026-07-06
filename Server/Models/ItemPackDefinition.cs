@@ -21,8 +21,80 @@ public class ItemPackDefinition
     [JsonPropertyName("containers")]
     public List<ContainerDefinition> Containers { get; set; } = [];
 
+    [JsonPropertyName("stims")]
+    public List<StimDefinition> Stims { get; set; } = [];
+
     [JsonPropertyName("traders")]
     public List<TraderDefinition> Traders { get; set; } = [];
+}
+
+public class StimBuff
+{
+    [JsonPropertyName("id")]
+    public string Id { get; set; } = string.Empty;
+
+    [JsonPropertyName("buffType")]
+    public string BuffType { get; set; } = "SkillRate";
+
+    [JsonPropertyName("skillName")]
+    public string SkillName { get; set; } = string.Empty;
+
+    [JsonPropertyName("value")]
+    public int Value { get; set; }
+
+    [JsonPropertyName("delay")]
+    public int Delay { get; set; } = 1;
+
+    [JsonPropertyName("duration")]
+    public int Duration { get; set; } = 300;
+
+    [JsonPropertyName("chance")]
+    public int Chance { get; set; } = 1;
+
+    [JsonPropertyName("absoluteValue")]
+    public bool AbsoluteValue { get; set; } = true;
+
+    [JsonPropertyName("hydration")]
+    public int? Hydration { get; set; }
+
+    [JsonPropertyName("energy")]
+    public int? Energy { get; set; }
+}
+
+public class StimDefinition : ItemDefinition
+{
+    [JsonPropertyName("itemSound")]
+    public string ItemSound { get; set; } = "med_stimulator";
+
+    [JsonPropertyName("stimulatorBuffs")]
+    public string StimulatorBuffs { get; set; } = string.Empty;
+
+    [JsonPropertyName("medEffectType")]
+    public string MedEffectType { get; set; } = "duringUse";
+
+    [JsonPropertyName("medUseTime")]
+    public int MedUseTime { get; set; } = 2;
+
+    [JsonPropertyName("maxHpResource")]
+    public int MaxHpResource { get; set; }
+
+    [JsonPropertyName("hpResourceRate")]
+    public int HpResourceRate { get; set; }
+
+    [JsonPropertyName("stackMaxSize")]
+    public int StackMaxSize { get; set; } = 1;
+
+    [JsonPropertyName("width")]
+    public int Width { get; set; } = 1;
+
+    [JsonPropertyName("height")]
+    public int Height { get; set; } = 1;
+
+    [JsonPropertyName("customBuffs")]
+    public List<StimBuff> CustomBuffs { get; set; } = [];
+
+    [JsonPropertyName("properties")]
+    public JsonElement Properties { get; set; }
 }
 
 public class TraderItemEntry

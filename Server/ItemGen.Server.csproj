@@ -23,7 +23,7 @@
     <None Include="package.json" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
-  <Target Name="DeployToSPT" AfterTargets="Build">
+  <Target Name="DeployToSPT" AfterTargets="Build" Condition="'$(DeployToSPT)' != 'false'">
     <PropertyGroup>
       <SPTModDir>C:\SPT\SPT\user\mods\ItemGen</SPTModDir>
     </PropertyGroup>

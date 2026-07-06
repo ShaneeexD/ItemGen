@@ -84,7 +84,7 @@ public static class TraderGenerator
             return;
         }
 
-        var itemId = new MongoId(entry.ItemId);
+        var itemTemplateId = new MongoId(entry.ItemId);
         var items = databaseService.GetItems();
         if (!items.ContainsKey(entry.ItemId))
         {
@@ -94,13 +94,13 @@ public static class TraderGenerator
             return;
         }
 
-        var stockCount = entry.UnlimitedStock ? int.MaxValue : entry.StockCount;
-        var buyRestrictionMax = entry.UnlimitedBuyRestriction ? int.MaxValue : entry.BuyRestrictionMax;
+        var stockCount = entry.UnlimitedStock ? 999999 : entry.StockCount;
+        int? buyRestrictionMax = entry.UnlimitedBuyRestriction ? null : entry.BuyRestrictionMax;
 
         var typedItem = new Item
         {
-            Id = itemId,
-            Template = itemId,
+            Id = itemTemplateId,
+            Template = itemTemplateId,
             ParentId = "hideout",
             SlotId = "hideout",
             Upd = new Upd
@@ -124,8 +124,8 @@ public static class TraderGenerator
                 }
             }
         };
-        assort.BarterScheme[itemId] = barterEntry;
-        assort.LoyalLevelItems[itemId] = entry.LoyaltyLevel;
+        assort.BarterScheme[itemTemplateId] = barterEntry;
+        assort.LoyalLevelItems[itemTemplateId] = entry.LoyaltyLevel;
 
         logger.LogWithColor(
             $"[ItemGen] Added item '{entry.ItemId}' to trader '{traderId}' at LL{entry.LoyaltyLevel} for {entry.PriceRoubles}₽",

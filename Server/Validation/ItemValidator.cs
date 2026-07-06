@@ -17,8 +17,9 @@ public static class ItemValidator
         var questList = pack.QuestItems ?? [];
         var keyList = pack.Keys ?? [];
         var containerList = pack.Containers ?? [];
+        var stimList = pack.Stims ?? [];
 
-        if (questList.Count == 0 && keyList.Count == 0 && containerList.Count == 0)
+        if (questList.Count == 0 && keyList.Count == 0 && containerList.Count == 0 && stimList.Count == 0)
         {
             errors.Add($"Pack '{fileName}': at least one item entry is required.");
             return errors;
@@ -90,6 +91,28 @@ public static class ItemValidator
 
             if (string.IsNullOrWhiteSpace(container.HandbookParentId))
                 errors.Add($"{prefix}: 'handbookParentId' is required.");
+        }
+
+        for (var i = 0; i < stimList.Count; i++)
+        {
+            var stim = stimList[i];
+            var prefix = $"Stim[{i}]";
+            ValidateItem(stim, prefix, errors, seenIds);
+
+            if (stim.Weight < 0)
+                errors.Add($"{prefix}: 'weight' cannot be negative.");
+
+            if (stim.MedUseTime < 0)
+                errors.Add($"{prefix}: 'medUseTime' cannot be negative.");
+
+            if (stim.StackMaxSize < 1)
+                errors.Add($"{prefix}: 'stackMaxSize' must be at least 1.");
+
+            if (stim.Width < 1)
+                errors.Add($"{prefix}: 'width' must be at least 1.");
+
+            if (stim.Height < 1)
+                errors.Add($"{prefix}: 'height' must be at least 1.");
         }
 
         var traderList = pack.Traders ?? [];

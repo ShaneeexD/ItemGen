@@ -1,0 +1,83 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net471</TargetFramework>
+    <RootNamespace>ItemGen.Client</RootNamespace>
+    <LangVersion>latest</LangVersion>
+    <OutputType>Library</OutputType>
+    <Version>1.0.0</Version>
+    <OutputPath>bin\$(Configuration)\</OutputPath>
+    <AssemblyName>ItemGen.Client</AssemblyName>
+    <SPTPath>C:\SPT</SPTPath>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- BepInEx -->
+    <Reference Include="0Harmony">
+      <HintPath>$(SPTPath)\BepInEx\core\0Harmony.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="BepInEx">
+      <HintPath>$(SPTPath)\BepInEx\core\BepInEx.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+
+    <!-- Game assemblies -->
+    <Reference Include="Assembly-CSharp">
+      <HintPath>D:\SPT MODS\Refs\Assembly-CSharp.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="UnityEngine">
+      <HintPath>$(SPTPath)\EscapeFromTarkov_Data\Managed\UnityEngine.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="UnityEngine.CoreModule">
+      <HintPath>$(SPTPath)\EscapeFromTarkov_Data\Managed\UnityEngine.CoreModule.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="UnityEngine.AssetBundleModule">
+      <HintPath>$(SPTPath)\EscapeFromTarkov_Data\Managed\UnityEngine.AssetBundleModule.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="Newtonsoft.Json">
+      <HintPath>$(SPTPath)\EscapeFromTarkov_Data\Managed\Newtonsoft.Json.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="Microsoft.CSharp" />
+    <Reference Include="Comfort">
+      <HintPath>$(SPTPath)\EscapeFromTarkov_Data\Managed\Comfort.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="Comfort.Unity">
+      <HintPath>$(SPTPath)\EscapeFromTarkov_Data\Managed\Comfort.Unity.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- SPT -->
+    <Reference Include="spt-reflection">
+      <HintPath>$(SPTPath)\BepInEx\plugins\spt\spt-reflection.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="bundles.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <!-- Auto-deploy to BepInEx plugins after build -->
+  <Target Name="DeployToSPT" AfterTargets="Build">
+    <PropertyGroup>
+      <ClientPluginDir>$(SPTPath)\BepInEx\plugins\Serenity-ItemGen</ClientPluginDir>
+    </PropertyGroup>
+    <MakeDir Directories="$(ClientPluginDir)" />
+    <Copy SourceFiles="$(OutputPath)$(AssemblyName).dll" DestinationFolder="$(ClientPluginDir)" OverwriteReadOnlyFiles="true" />
+    <Copy SourceFiles="$(OutputPath)bundles.json" DestinationFolder="$(ClientPluginDir)" OverwriteReadOnlyFiles="true" />
+    <Copy SourceFiles="$(OutputPath)$(AssemblyName).pdb" DestinationFolder="$(ClientPluginDir)" OverwriteReadOnlyFiles="true" Condition="Exists('$(OutputPath)$(AssemblyName).pdb')" />
+    <ItemGroup>
+      <BundleFiles Include="$(ProjectDir)bundles\**\*.*" />
+    </ItemGroup>
+    <Copy SourceFiles="@(BundleFiles)" DestinationFiles="@(BundleFiles->'$(ClientPluginDir)\bundles\%(RecursiveDir)%(Filename)%(Extension)')" OverwriteReadOnlyFiles="true" Condition="'@(BundleFiles)' != ''" />
+    <Message Text="[ItemGen] Client deployed to $(ClientPluginDir)" Importance="high" />
+  </Target>
+</Project>
