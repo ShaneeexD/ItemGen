@@ -7,6 +7,7 @@ import {
   ArrowUp,
   Copy,
   Download,
+  ExternalLink,
   FileJson,
   Fingerprint,
   HelpCircle,
@@ -332,14 +333,15 @@ function Sidebar({ open, onClose }: { open: boolean; onClose: () => void }) {
               target={link.url.startsWith('http') ? '_blank' : undefined}
               rel={link.url.startsWith('http') ? 'noopener noreferrer' : undefined}
               onClick={link.url === '#' ? onClose : undefined}
-              className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors ${
+              className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors ${
                 link.active
-                  ? 'bg-tarkov-accent/10 text-tarkov-accent'
+                  ? 'bg-tarkov-accent/20 text-tarkov-accent border border-tarkov-accent/50'
                   : 'text-tarkov-text hover:bg-tarkov-border/50 hover:text-tarkov-text'
               }`}
             >
               {link.icon}
-              <span className="font-medium">{link.name}</span>
+              <span className="flex-1">{link.name}</span>
+              <ExternalLink size={14} className="text-tarkov-text-dim" />
             </a>
           ))}
         </nav>
