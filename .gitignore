@@ -122,3 +122,12 @@ $RECYCLE.BIN/
 # Linux
 *~
 .directory
+
+###################
+# Mod Page Metadata
+###################
+
+forgepage.md
+
+# Local Netlify folder
+.netlify
