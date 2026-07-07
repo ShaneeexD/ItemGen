@@ -238,6 +238,18 @@ function cleanProperties(props: Record<string, any>, allowed: string[], defaults
         if (path) {
           next[key] = { path, rcid: value?.rcid ?? '' }
         }
+      } else if (key === 'Grids' && Array.isArray(value)) {
+        next[key] = value.map(grid => ({
+          ...grid,
+          _props: {
+            ...grid._props,
+            filters: grid._props?.filters?.map((f: any) => ({
+              ...f,
+              Filter: f.Filter?.filter(Boolean) ?? [],
+              ExcludedFilter: f.ExcludedFilter?.filter(Boolean) ?? [],
+            })) ?? grid._props?.filters,
+          },
+        }))
       } else {
         next[key] = JSON.parse(JSON.stringify(value))
       }
@@ -250,8 +262,13 @@ function buildExportJson(pack: ItemPackDefinition): string {
   const cleaned: ItemPackDefinition = {
     ...pack,
     bundles: undefined,
+    questItems: pack.questItems.map(q => ({
+      ...q,
+      questIds: q.questIds.filter(Boolean),
+    })),
     keys: pack.keys.map(k => ({
       ...k,
+      doorIds: k.doorIds.filter(Boolean),
       properties: cleanProperties(k.properties || {}, ['Prefab', 'UsePrefab']),
     })),
     containers: pack.containers.map(c => ({
@@ -931,7 +948,7 @@ export default function App() {
                       </Field>
                     </div>
                     <Field label="Linked Quest IDs (optional)" tooltip="Comma-separated quest template IDs that use this item in a FindItem condition. Used by companion mods (e.g. TraderGen) to auto-generate quests." className="mt-4">
-                      <input className="input-field" placeholder="e.g. 5936da9e86f7742d65037edf, ..." value={(selectedItem as QuestItemDefinition).questIds.join(', ')} onChange={e => updateItem(selectedIndex, { questIds: e.target.value.split(',').map(s => s.trim()).filter(Boolean) })} />
+                      <input className="input-field" placeholder="e.g. 5936da9e86f7742d65037edf, ..." value={(selectedItem as QuestItemDefinition).questIds.join(', ')} onChange={e => updateItem(selectedIndex, { questIds: e.target.value.split(',').map(s => s.trim()) })} />
                     </Field>
                     <div className="mt-3 text-sm text-tarkov-text-dim bg-tarkov-bg border border-tarkov-border rounded p-3">
                       <span className="text-tarkov-accent font-semibold">Note:</span> The server sets <span className="font-mono">QuestItem = true</span> on this item so it behaves exactly like a vanilla EFT quest inventory item.
@@ -964,7 +981,7 @@ export default function App() {
                       </Field>
                     </div>
                     <Field label="Door IDs (optional)" tooltip="Comma-separated vanilla door IDs this key opens. These are patched into the key's KeyIds on the server. Leave empty to inherit from the base template." className="mt-4">
-                      <input className="input-field" placeholder="e.g. 123456789012345678901234, 567890123456789012345678" value={(selectedItem as KeyDefinition).doorIds.join(', ')} onChange={e => updateItem(selectedIndex, { doorIds: e.target.value.split(',').map(s => s.trim()).filter(Boolean) })} />
+                      <input className="input-field" placeholder="e.g. 123456789012345678901234, 567890123456789012345678" value={(selectedItem as KeyDefinition).doorIds.join(', ')} onChange={e => updateItem(selectedIndex, { doorIds: e.target.value.split(',').map(s => s.trim()) })} />
                     </Field>
                     <div className="mt-3 text-sm text-tarkov-text-dim bg-tarkov-bg border border-tarkov-border rounded p-3">
                       <span className="text-tarkov-accent font-semibold">Note:</span> Door IDs should be vanilla EFT door IDs. Custom doors added by mods such as Map Editor Lite can have the key ID set in the editor.
@@ -1212,9 +1229,10 @@ function TraderEditor({ pack, traderIndex, onChange }: { pack: ItemPackDefinitio
 }
 
 function FilterIdChips({ ids }: { ids: string[] }) {
+  const visibleIds = ids.filter(Boolean)
   return (
     <div className="flex flex-wrap gap-1 mt-2">
-      {ids.map(id => {
+      {visibleIds.map(id => {
         const name = getItemOrCategoryName(id)
         const isCategory = name?.startsWith('Category:')
         return (
@@ -1230,7 +1248,7 @@ function FilterIdChips({ ids }: { ids: string[] }) {
           </a>
         )
       })}
-      {ids.length === 0 && <span className="text-xs text-tarkov-text-dim">No IDs set</span>}
+      {visibleIds.length === 0 && <span className="text-xs text-tarkov-text-dim">No IDs set</span>}
     </div>
   )
 }
@@ -1559,7 +1577,7 @@ function ContainerSpecifics({ container, onChange }: ContainerSpecificsProps) {
               </div>
               <Field label="Allowed Item IDs (comma-separated)" className="mt-1">
                 <input className="input-field" placeholder="e.g. 5448eb774bdc2d0a728b4567, ..." value={filter.join(', ')} onChange={e => {
-                  const ids = e.target.value.split(',').map(s => s.trim()).filter(Boolean)
+                  const ids = e.target.value.split(',').map(s => s.trim())
                   const nextFilters = [{ ...(gProps.filters?.[0] || {}), Filter: ids }]
                   updateGrid(i, { _props: { ...gProps, filters: nextFilters } })
                 }} />
@@ -1567,7 +1585,7 @@ function ContainerSpecifics({ container, onChange }: ContainerSpecificsProps) {
               </Field>
               <Field label="Excluded Item IDs (comma-separated)" className="mt-3">
                 <input className="input-field" placeholder="e.g. 5448eb774bdc2d0a728b4567, ..." value={excluded.join(', ')} onChange={e => {
-                  const ids = e.target.value.split(',').map(s => s.trim()).filter(Boolean)
+                  const ids = e.target.value.split(',').map(s => s.trim())
                   const nextFilters = [{ ...(gProps.filters?.[0] || {}), ExcludedFilter: ids }]
                   updateGrid(i, { _props: { ...gProps, filters: nextFilters } })
                 }} />
