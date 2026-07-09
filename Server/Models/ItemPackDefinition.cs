@@ -49,7 +49,7 @@ public class StimBuff
     public int Duration { get; set; } = 300;
 
     [JsonPropertyName("chance")]
-    public int Chance { get; set; } = 1;
+    public float Chance { get; set; } = 1;
 
     [JsonPropertyName("absoluteValue")]
     public bool AbsoluteValue { get; set; } = true;
@@ -73,7 +73,7 @@ public class StimDefinition : ItemDefinition
     public string MedEffectType { get; set; } = "duringUse";
 
     [JsonPropertyName("medUseTime")]
-    public int MedUseTime { get; set; } = 2;
+    public float MedUseTime { get; set; } = 2;
 
     [JsonPropertyName("maxHpResource")]
     public int MaxHpResource { get; set; }
