@@ -11,6 +11,7 @@ using SPTarkov.Server.Core.Models.Utils;
 using SPTarkov.Server.Core.Services;
 using SPTarkov.Server.Core.Services.Mod;
 using ItemGen.Models;
+using MongoId = SPTarkov.Server.Core.Models.Common.MongoId;
 
 namespace ItemGen.Generators;
 
@@ -97,6 +98,8 @@ public static class ContainerGenerator
         {
             logger.LogWithColor($"[ItemGen] Registered container: {def.Name} ({def.Id})", LogTextColor.Green);
 
+            PatchSafeContainerFilters(databaseService, def, logger);
+
             if (!string.IsNullOrWhiteSpace(customPrefabPath) || !string.IsNullOrWhiteSpace(customUsePrefabPath))
             {
                 var items = databaseService.GetItems();
@@ -124,6 +127,73 @@ public static class ContainerGenerator
             logger.LogWithColor(
                 $"[ItemGen] CreateItemFromClone reported failure for container '{def.Name}': {string.Join(", ", result.Errors ?? [])}",
                 LogTextColor.Yellow);
+        }
+    }
+
+    private static readonly string[] DefaultSafeContainerIds =
+    {
+        "544a11ac4bdc2d470e8b456a", // Alpha
+        "5857a8b324597729ab0a0e7d", // Beta
+        "5857a8bc2459772bad15db29", // Gamma
+        "59db794186f77448bc595262", // Epsilon
+        "5c093ca986f7740a1867ab12", // Kappa
+        "676008db84e242067d0dc4c9", // Kappa (Desecrated)
+        "664a55d84a90fc2c8a6305c9", // Theta
+        "60b0f9326c1d6c524c5ce3d5", // Waist pouch
+    };
+
+    private static void PatchSafeContainerFilters(
+        DatabaseService databaseService,
+        ContainerDefinition def,
+        ISptLogger<ItemGenPlugin> logger)
+    {
+        if (def.SafeContainerMode == SafeContainerMode.Include && def.SafeContainerIds.Count == 0)
+        {
+            logger.LogWithColor($"[ItemGen] Container '{def.Name}' has safeContainerMode 'include' but no IDs; skipping safe-container patch.", LogTextColor.Yellow);
+            return;
+        }
+
+        var targetIds = def.SafeContainerMode switch
+        {
+            SafeContainerMode.All => DefaultSafeContainerIds.ToList(),
+            SafeContainerMode.Include => def.SafeContainerIds,
+            SafeContainerMode.Exclude => DefaultSafeContainerIds.Except(def.SafeContainerIds).ToList(),
+            _ => DefaultSafeContainerIds.ToList(),
+        };
+
+        var itemId = new MongoId(def.Id);
+        var items = databaseService.GetItems();
+        var patched = 0;
+        foreach (var safeId in targetIds)
+        {
+            if (!items.TryGetValue(safeId, out var safeContainer) || safeContainer.Properties?.Grids == null)
+            {
+                continue;
+            }
+
+            // SPT only checks the first grid's first filter when deciding if an item is allowed.
+            var firstGrid = safeContainer.Properties.Grids.FirstOrDefault();
+            var firstFilter = firstGrid?.Properties?.Filters?.FirstOrDefault();
+            if (firstFilter == null)
+            {
+                continue;
+            }
+
+            firstFilter.ExcludedFilter ??= new HashSet<MongoId>();
+            firstFilter.ExcludedFilter.Remove(itemId);
+
+            firstFilter.Filter ??= new HashSet<MongoId>();
+            if (!firstFilter.Filter.Contains(itemId))
+            {
+                firstFilter.Filter.Add(itemId);
+            }
+
+            patched++;
+        }
+
+        if (patched > 0)
+        {
+            logger.LogWithColor($"[ItemGen] Patched {patched} safe container(s) to allow '{def.Name}'.", LogTextColor.Green);
         }
     }
 

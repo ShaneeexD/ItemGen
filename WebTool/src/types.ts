@@ -46,6 +46,8 @@ export interface ContainerDefinition extends ItemDefinition {
   parent: string
   handbookParentId: string
   properties: Record<string, any>
+  safeContainerMode: 'all' | 'include' | 'exclude'
+  safeContainerIds: string[]
 }
 
 export interface StimBuff {
@@ -160,6 +162,8 @@ export function createDefaultContainer(): ContainerDefinition {
     parent: '5795f317245977243854e041',
     handbookParentId: '5b5f6fa186f77409407a7eb7',
     properties: {},
+    safeContainerMode: 'all',
+    safeContainerIds: [],
   }
 }
 

@@ -91,6 +91,15 @@ public static class ItemValidator
 
             if (string.IsNullOrWhiteSpace(container.HandbookParentId))
                 errors.Add($"{prefix}: 'handbookParentId' is required.");
+
+            if (container.SafeContainerMode == SafeContainerMode.Include && container.SafeContainerIds.Count == 0)
+                errors.Add($"{prefix}: 'safeContainerIds' must contain at least one ID when mode is 'include'.");
+
+            for (var j = 0; j < container.SafeContainerIds.Count; j++)
+            {
+                if (!Hex24.IsMatch(container.SafeContainerIds[j]))
+                    errors.Add($"{prefix}: 'safeContainerIds[{j}]' must be a 24-character hex string.");
+            }
         }
 
         for (var i = 0; i < stimList.Count; i++)

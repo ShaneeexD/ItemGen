@@ -193,6 +193,11 @@ function validatePack(pack: ItemPackDefinition): ValidationError[] {
     if (!container.shortName.trim()) errors.push({ field: `${prefix}.shortName`, message: 'Short name is required.' })
     if (!container.description.trim()) errors.push({ field: `${prefix}.description`, message: 'Description is required.' })
     if (container.weight < 0) errors.push({ field: `${prefix}.weight`, message: 'Weight cannot be negative.' })
+    if (container.safeContainerMode !== 'all' && container.safeContainerIds.length === 0)
+      errors.push({ field: `${prefix}.safeContainerIds`, message: 'At least one safe container ID is required when using Include or Exclude mode.' })
+    container.safeContainerIds.forEach((id, j) => {
+      if (!HEX24.test(id)) errors.push({ field: `${prefix}.safeContainerIds[${j}]`, message: 'Safe container ID must be 24 hex characters.' })
+    })
   })
 
   pack.stims.forEach((stim, i) => {
@@ -541,7 +546,11 @@ export default function App() {
         name: imported.name || 'Imported Pack',
         questItems: imported.questItems || [],
         keys: imported.keys || [],
-        containers: imported.containers || [],
+        containers: (imported.containers || []).map(c => ({
+          ...c,
+          safeContainerMode: c.safeContainerMode ?? 'all',
+          safeContainerIds: c.safeContainerIds || [],
+        })),
         stims: imported.stims || [],
         traders: imported.traders?.length
           ? imported.traders
@@ -1594,6 +1603,25 @@ function ContainerSpecifics({ container, onChange }: ContainerSpecificsProps) {
             </div>
           )
         })}
+      </div>
+
+      <div className="mt-6 border-t border-tarkov-border pt-4">
+        <h3 className="text-sm font-semibold text-tarkov-text mb-2">Safe Container Allow-list</h3>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <Field label="Mode" tooltip="All = allow inside every vanilla safe container. Include only = allow only inside the listed IDs. Exclude only = allow inside all vanilla safe containers except the listed IDs.">
+            <select className="input-field" value={container.safeContainerMode} onChange={e => onChange({ safeContainerMode: e.target.value as ContainerDefinition['safeContainerMode'] })}>
+              <option value="all">All safe containers</option>
+              <option value="include">Include only</option>
+              <option value="exclude">Exclude only</option>
+            </select>
+          </Field>
+          <Field label="Safe Container IDs" tooltip="Comma-separated safe container IDs. Only used when Mode is Include or Exclude. Leave empty for All." className="md:col-span-2">
+            <input className="input-field" placeholder="e.g. 544a11ac4bdc2d470e8b456a, 5857a8b324597729ab0a0e7d" value={container.safeContainerIds.join(', ')} onChange={e => onChange({ safeContainerIds: e.target.value.split(',').map(s => s.trim()).filter(Boolean) })} disabled={container.safeContainerMode === 'all'} />
+          </Field>
+        </div>
+        <div className="mt-2 text-xs text-tarkov-text-dim">
+          Default vanilla IDs: Alpha 544a11ac4bdc2d470e8b456a, Beta 5857a8b324597729ab0a0e7d, Gamma 5857a8bc2459772bad15db29, Epsilon 59db794186f77448bc595262, Kappa 5c093ca986f7740a1867ab12, Theta 664a55d84a90fc2c8a6305c9, Waist pouch 60b0f9326c1d6c524c5ce3d5
+        </div>
       </div>
 
     </Section>

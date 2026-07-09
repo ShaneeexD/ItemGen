@@ -215,4 +215,18 @@ public class ContainerDefinition : ItemDefinition
 
     [JsonPropertyName("properties")]
     public JsonElement Properties { get; set; }
+
+    [JsonPropertyName("safeContainerMode")]
+    public SafeContainerMode SafeContainerMode { get; set; } = SafeContainerMode.All;
+
+    [JsonPropertyName("safeContainerIds")]
+    public List<string> SafeContainerIds { get; set; } = [];
+}
+
+[JsonConverter(typeof(JsonStringEnumConverter<SafeContainerMode>))]
+public enum SafeContainerMode
+{
+    All,
+    Include,
+    Exclude,
 }
