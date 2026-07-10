@@ -1,4 +1,4 @@
-import { StimBuff } from './types'
+import { StimBuff, EffectsHealthProperties, EffectsDamageProperties } from './types'
 
 export interface StimTemplate {
   id: string
@@ -17,9 +17,12 @@ export interface StimTemplate {
   medUseTime: number
   maxHpResource: number
   hpResourceRate: number
+  maxBodyPartsToHeal?: number
   prefab: string
   usePrefab: string
   customBuffs: StimBuff[]
+  effectsHealth?: Record<string, EffectsHealthProperties>
+  effectsDamage?: Record<string, EffectsDamageProperties>
   properties: Record<string, any>
 }
 

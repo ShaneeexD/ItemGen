@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using SPTarkov.Server.Core.Models.Eft.Common.Tables;
 
 namespace ItemGen.Models;
 
@@ -81,6 +82,9 @@ public class StimDefinition : ItemDefinition
     [JsonPropertyName("hpResourceRate")]
     public int HpResourceRate { get; set; }
 
+    [JsonPropertyName("maxBodyPartsToHeal")]
+    public int MaxBodyPartsToHeal { get; set; }
+
     [JsonPropertyName("stackMaxSize")]
     public int StackMaxSize { get; set; } = 1;
 
@@ -92,6 +96,12 @@ public class StimDefinition : ItemDefinition
 
     [JsonPropertyName("customBuffs")]
     public List<StimBuff> CustomBuffs { get; set; } = [];
+
+    [JsonPropertyName("effectsHealth")]
+    public Dictionary<string, EffectsHealthProperties>? EffectsHealth { get; set; }
+
+    [JsonPropertyName("effectsDamage")]
+    public Dictionary<string, EffectsDamageProperties>? EffectsDamage { get; set; }
 
     [JsonPropertyName("properties")]
     public JsonElement Properties { get; set; }

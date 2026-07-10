@@ -63,6 +63,22 @@ export interface StimBuff {
   energy?: number
 }
 
+export interface EffectsHealthProperties {
+  value?: number
+  delay?: number
+  duration?: number
+}
+
+export interface EffectsDamageProperties {
+  value?: number
+  delay?: number
+  duration?: number
+  fadeOut?: number
+  cost?: number
+  healthPenaltyMin?: number
+  healthPenaltyMax?: number
+}
+
 export interface StimDefinition extends ItemDefinition {
   itemSound: string
   stimulatorBuffs: string
@@ -70,10 +86,13 @@ export interface StimDefinition extends ItemDefinition {
   medUseTime: number
   maxHpResource: number
   hpResourceRate: number
+  maxBodyPartsToHeal: number
   stackMaxSize: number
   width: number
   height: number
   customBuffs: StimBuff[]
+  effectsHealth: Record<string, EffectsHealthProperties>
+  effectsDamage: Record<string, EffectsDamageProperties>
   properties: Record<string, any>
 }
 
@@ -297,10 +316,13 @@ export function createDefaultStim(): StimDefinition {
     medUseTime: 2,
     maxHpResource: 0,
     hpResourceRate: 0,
+    maxBodyPartsToHeal: 0,
     stackMaxSize: 1,
     width: 1,
     height: 1,
     customBuffs: [],
+    effectsHealth: {},
+    effectsDamage: {},
     properties: {},
   }
 }

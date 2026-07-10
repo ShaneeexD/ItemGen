@@ -4,6 +4,7 @@ using ItemGen.Converters;
 using SPTarkov.Server.Core.Models.Common;
 using SPTarkov.Server.Core.Models.Eft.Common;
 using SPTarkov.Server.Core.Models.Eft.Common.Tables;
+using SPTarkov.Server.Core.Models.Enums;
 using SPTarkov.Server.Core.Models.Logging;
 using SPTarkov.Server.Core.Models.Spt.Mod;
 using SPTarkov.Server.Core.Models.Utils;
@@ -68,10 +69,15 @@ public static class StimGenerator
             ? def.StimulatorBuffs
             : $"Buffs_ItemGen_{def.Id}";
 
+        if (def.MaxBodyPartsToHeal > 0)
+        {
+            buffSetKey = $"{buffSetKey}_MaxBodyParts_{def.MaxBodyPartsToHeal}";
+        }
+
         overrides.ItemSound = def.ItemSound;
         overrides.StimulatorBuffs = buffSetKey;
-        overrides.EffectsHealth = null;
-        overrides.EffectsDamage = null;
+        overrides.EffectsHealth = ConvertEffectsHealth(def.EffectsHealth);
+        overrides.EffectsDamage = ConvertEffectsDamage(def.EffectsDamage);
         overrides.BodyPartPriority = null;
         overrides.FoodEffectType = null;
         overrides.MedEffectType = def.MedEffectType;
@@ -153,7 +159,8 @@ public static class StimGenerator
         string buffSetKey,
         ISptLogger<ItemGenPlugin> logger)
     {
-        if (def.CustomBuffs.Count == 0)
+        var needsBuffKey = def.CustomBuffs.Count > 0 || def.MaxBodyPartsToHeal > 0;
+        if (!needsBuffKey)
         {
             return;
         }
@@ -169,16 +176,28 @@ public static class StimGenerator
                 return;
             }
 
-            var buffs = def.CustomBuffs.Select(b => new Buff
+            List<Buff> buffs;
+            if (def.CustomBuffs.Count > 0)
             {
-                BuffType = b.BuffType,
-                Chance = (float)b.Chance,
-                Delay = (float)b.Delay,
-                Duration = (float)b.Duration,
-                Value = (float)b.Value,
-                AbsoluteValue = b.AbsoluteValue,
-                SkillName = b.SkillName,
-            }).ToList();
+                buffs = def.CustomBuffs.Select(b => new Buff
+                {
+                    BuffType = b.BuffType,
+                    Chance = (float)b.Chance,
+                    Delay = (float)b.Delay,
+                    Duration = (float)b.Duration,
+                    Value = (float)b.Value,
+                    AbsoluteValue = b.AbsoluteValue,
+                    SkillName = b.SkillName,
+                }).ToList();
+            }
+            else if (!string.IsNullOrWhiteSpace(def.StimulatorBuffs) && TryGetExistingBuffs(stimulatorBuffs, def.StimulatorBuffs, out var existingBuffs))
+            {
+                buffs = existingBuffs;
+            }
+            else
+            {
+                buffs = new List<Buff>();
+            }
 
             SetDictionaryValue(stimulatorBuffs, buffSetKey, buffs);
 
@@ -318,6 +337,37 @@ public static class StimGenerator
         return current;
     }
 
+    private static bool TryGetExistingBuffs(object dictionary, string key, out List<Buff> existingBuffs)
+    {
+        existingBuffs = new List<Buff>();
+        try
+        {
+            if (dictionary is System.Collections.IDictionary idict && idict[key] is not null)
+            {
+                var value = idict[key];
+                if (value is IEnumerable<Buff> buffEnumerable)
+                {
+                    existingBuffs = buffEnumerable.ToList();
+                    return true;
+                }
+
+                if (value is System.Collections.IEnumerable enumerable)
+                {
+                    foreach (var item in enumerable)
+                    {
+                        if (item is Buff buff)
+                        {
+                            existingBuffs.Add(buff);
+                        }
+                    }
+                    return existingBuffs.Count > 0;
+                }
+            }
+        }
+        catch { }
+        return false;
+    }
+
     private static void SetDictionaryValue(object dictionary, string key, object value)
     {
         if (dictionary is System.Collections.IDictionary idict)
@@ -382,5 +432,49 @@ public static class StimGenerator
             }
         }
         return "5b47574386f77428ca22b33a";
+    }
+
+    private static Dictionary<HealthFactor, EffectsHealthProperties>? ConvertEffectsHealth(
+        Dictionary<string, EffectsHealthProperties>? source)
+    {
+        if (source is null || source.Count == 0)
+        {
+            return null;
+        }
+
+        var result = new Dictionary<HealthFactor, EffectsHealthProperties>();
+        foreach (var (key, value) in source)
+        {
+            if (value is null || !Enum.TryParse<HealthFactor>(key, true, out var healthFactor))
+            {
+                continue;
+            }
+
+            result[healthFactor] = value;
+        }
+
+        return result.Count > 0 ? result : null;
+    }
+
+    private static Dictionary<DamageEffectType, EffectsDamageProperties>? ConvertEffectsDamage(
+        Dictionary<string, EffectsDamageProperties>? source)
+    {
+        if (source is null || source.Count == 0)
+        {
+            return null;
+        }
+
+        var result = new Dictionary<DamageEffectType, EffectsDamageProperties>();
+        foreach (var (key, value) in source)
+        {
+            if (value is null || !Enum.TryParse<DamageEffectType>(key, true, out var damageEffectType))
+            {
+                continue;
+            }
+
+            result[damageEffectType] = value;
+        }
+
+        return result.Count > 0 ? result : null;
     }
 }

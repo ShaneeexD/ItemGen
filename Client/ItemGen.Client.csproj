@@ -23,7 +23,11 @@
 
     <!-- Game assemblies -->
     <Reference Include="Assembly-CSharp">
-      <HintPath>D:\SPT MODS\Refs\Assembly-CSharp.dll</HintPath>
+      <HintPath>$(SPTPath)\EscapeFromTarkov_Data\Managed\Assembly-CSharp.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="ItemTemplate.Types">
+      <HintPath>$(SPTPath)\EscapeFromTarkov_Data\Managed\ItemTemplate.Types.dll</HintPath>
       <Private>false</Private>
     </Reference>
     <Reference Include="UnityEngine">
@@ -57,6 +61,10 @@
     <!-- SPT -->
     <Reference Include="spt-reflection">
       <HintPath>$(SPTPath)\BepInEx\plugins\spt\spt-reflection.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="ItemComponent.Types">
+      <HintPath>$(SPTPath)\EscapeFromTarkov_Data\Managed\ItemComponent.Types.dll</HintPath>
       <Private>false</Private>
     </Reference>
   </ItemGroup>

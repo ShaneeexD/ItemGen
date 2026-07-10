@@ -35,6 +35,8 @@ import {
   ContainerDefinition,
   StimBuff,
   StimDefinition,
+  EffectsHealthProperties,
+  EffectsDamageProperties,
   TraderDefinition,
   TraderItemEntry,
   ValidationError,
@@ -551,7 +553,10 @@ export default function App() {
           safeContainerMode: c.safeContainerMode ?? 'all',
           safeContainerIds: c.safeContainerIds || [],
         })),
-        stims: imported.stims || [],
+        stims: (imported.stims || []).map(s => ({
+          ...s,
+          maxBodyPartsToHeal: s.maxBodyPartsToHeal ?? 0,
+        })),
         traders: imported.traders?.length
           ? imported.traders
           : VANILLA_TRADERS.map(t => ({ traderId: t.id, enabled: true, entries: [] })),
@@ -639,10 +644,13 @@ export default function App() {
         medUseTime: template?.medUseTime ?? (typeof props.medUseTime === 'number' ? props.medUseTime : 2),
         maxHpResource: template?.maxHpResource ?? (typeof props.MaxHpResource === 'number' ? props.MaxHpResource : 0),
         hpResourceRate: template?.hpResourceRate ?? (typeof props.hpResourceRate === 'number' ? props.hpResourceRate : 0),
+        maxBodyPartsToHeal: template?.maxBodyPartsToHeal ?? (typeof props.MaxBodyPartsToHeal === 'number' ? props.MaxBodyPartsToHeal : 0),
         stackMaxSize: template?.stackMaxSize ?? (typeof props.StackMaxSize === 'number' ? props.StackMaxSize : 1),
         width: template?.width ?? (typeof props.Width === 'number' ? props.Width : 1),
         height: template?.height ?? (typeof props.Height === 'number' ? props.Height : 1),
         customBuffs: template?.customBuffs ?? [],
+        effectsHealth: template?.effectsHealth ?? {},
+        effectsDamage: template?.effectsDamage ?? {},
         properties: cleanProps,
       } as Partial<StimDefinition>)
     } else {
@@ -1291,7 +1299,30 @@ const STIM_BUFF_TYPES = [
   'HalloweenBuff',
   'MisfireEffect',
   'ZombieInfection',
+  'FrostbiteBuff',
   'Custom',
+]
+
+const HEALTH_FACTORS = [
+  'Health',
+  'Hydration',
+  'Energy',
+  'Radiation',
+  'Temperature',
+  'Poisoning',
+  'Effect',
+]
+
+const DAMAGE_EFFECT_TYPES = [
+  'HeavyBleeding',
+  'LightBleeding',
+  'Fracture',
+  'Contusion',
+  'Intoxication',
+  'LethalIntoxication',
+  'RadExposure',
+  'Pain',
+  'DestroyedPart',
 ]
 
 const KNOWN_STIM_BUFFS = [
@@ -1348,6 +1379,35 @@ const SKILL_NAMES = [
   'Custom',
 ]
 
+interface EffectSelectorProps {
+  options: string[]
+  onSelect: (value: string) => void
+  label: string
+}
+
+function EffectSelector({ options, onSelect, label }: EffectSelectorProps) {
+  const [value, setValue] = useState('')
+
+  const handleAdd = () => {
+    if (value) {
+      onSelect(value)
+      setValue('')
+    }
+  }
+
+  return (
+    <div className="flex items-center gap-2">
+      <select className="input-field text-xs" value={value} onChange={e => setValue(e.target.value)}>
+        <option value="">{label}</option>
+        {options.map(o => <option key={o} value={o}>{o}</option>)}
+      </select>
+      <button className="btn-secondary text-xs flex items-center gap-1" onClick={handleAdd} disabled={!value}>
+        <Plus size={14} /> Add
+      </button>
+    </div>
+  )
+}
+
 interface StimSpecificsProps {
   stim: StimDefinition
   onChange: (updates: Partial<StimDefinition>) => void
@@ -1381,6 +1441,38 @@ function StimSpecifics({ stim, onChange }: StimSpecificsProps) {
     onChange({ stimulatorBuffs: value, properties: nextProps })
   }
 
+  const updateHealthEffect = (key: string, updates: Partial<EffectsHealthProperties>) => {
+    const next = { ...stim.effectsHealth, [key]: { ...(stim.effectsHealth[key] ?? {}), ...updates } }
+    onChange({ effectsHealth: next })
+  }
+
+  const removeHealthEffect = (key: string) => {
+    const { [key]: _, ...next } = stim.effectsHealth
+    onChange({ effectsHealth: next })
+  }
+
+  const addHealthEffect = (key: string) => {
+    if (key && !stim.effectsHealth[key]) {
+      onChange({ effectsHealth: { ...stim.effectsHealth, [key]: {} } })
+    }
+  }
+
+  const updateDamageEffect = (key: string, updates: Partial<EffectsDamageProperties>) => {
+    const next = { ...stim.effectsDamage, [key]: { ...(stim.effectsDamage[key] ?? {}), ...updates } }
+    onChange({ effectsDamage: next })
+  }
+
+  const removeDamageEffect = (key: string) => {
+    const { [key]: _, ...next } = stim.effectsDamage
+    onChange({ effectsDamage: next })
+  }
+
+  const addDamageEffect = (key: string) => {
+    if (key && !stim.effectsDamage[key]) {
+      onChange({ effectsDamage: { ...stim.effectsDamage, [key]: {} } })
+    }
+  }
+
   return (
     <Section title="Stim Specifics" icon={<Syringe size={18} />}>
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -1408,6 +1500,9 @@ function StimSpecifics({ stim, onChange }: StimSpecificsProps) {
         </Field>
         <Field label="HP Resource Rate" tooltip="HP regeneration rate. Usually 0 for stims.">
           <input className="input-field" type="number" min={0} value={stim.hpResourceRate} onChange={e => onChange({ hpResourceRate: parseInt(e.target.value) || 0 })} />
+        </Field>
+        <Field label="Max Body Parts" tooltip="Maximum number of body parts this stim can heal in one use (0 = unlimited). Randomly picks if more are damaged.">
+          <input className="input-field" type="number" min={0} value={stim.maxBodyPartsToHeal} onChange={e => onChange({ maxBodyPartsToHeal: parseInt(e.target.value) || 0 })} />
         </Field>
         <Field label="Stack Max Size" tooltip="Maximum number of this item that can stack in one cell.">
           <input className="input-field" type="number" min={1} value={stim.stackMaxSize} onChange={e => onChange({ stackMaxSize: parseInt(e.target.value) || 1 })} />
@@ -1492,6 +1587,93 @@ function StimSpecifics({ stim, onChange }: StimSpecificsProps) {
               </Field>
               <Field label="Absolute Value" tooltip="Whether the value is an absolute amount rather than a multiplier.">
                 <Toggle checked={buff.absoluteValue} onChange={v => updateBuff(i, { absoluteValue: v })} />
+              </Field>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <div className="mt-6">
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="text-sm font-semibold text-tarkov-text">Health Effects</h3>
+          <EffectSelector options={HEALTH_FACTORS} onSelect={addHealthEffect} label="Add health effect" />
+        </div>
+
+        {Object.keys(stim.effectsHealth).length === 0 && (
+          <div className="text-sm text-tarkov-text-dim bg-tarkov-bg border border-tarkov-border rounded p-3">
+            No health effects. Add effects like Hydration/Energy regeneration.
+          </div>
+        )}
+
+        {Object.entries(stim.effectsHealth).map(([key, effect]) => (
+          <div key={key} className="card p-3 mb-3 bg-tarkov-bg border border-tarkov-border">
+            <div className="flex items-center justify-between mb-3">
+              <span className="text-xs font-semibold text-tarkov-text-dim uppercase">{key}</span>
+              <button className="btn-danger text-xs flex items-center gap-1" onClick={() => removeHealthEffect(key)}>
+                <Trash2 size={14} /> Remove
+              </button>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              <Field label="Value" tooltip="Magnitude of the health effect.">
+                <input className="input-field" type="number" value={effect.value ?? ''} onChange={e => updateHealthEffect(key, { value: e.target.value === '' ? undefined : parseFloat(e.target.value) })} />
+              </Field>
+              <Field label="Delay (s)" tooltip="Seconds before the effect starts.">
+                <input className="input-field" type="number" min={0} value={effect.delay ?? ''} onChange={e => updateHealthEffect(key, { delay: e.target.value === '' ? undefined : parseFloat(e.target.value) })} />
+              </Field>
+              <Field label="Duration (s)" tooltip="How long the effect lasts.">
+                <input className="input-field" type="number" min={0} value={effect.duration ?? ''} onChange={e => updateHealthEffect(key, { duration: e.target.value === '' ? undefined : parseFloat(e.target.value) })} />
+              </Field>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <div className="mt-6">
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="text-sm font-semibold text-tarkov-text">Damage Effects</h3>
+          <EffectSelector options={DAMAGE_EFFECT_TYPES} onSelect={addDamageEffect} label="Add damage effect" />
+        </div>
+
+        {Object.keys(stim.effectsDamage).length === 0 && (
+          <div className="text-sm text-tarkov-text-dim bg-tarkov-bg border border-tarkov-border rounded p-3">
+            No damage effects. Add effects the item treats, like Fracture or Pain.
+          </div>
+        )}
+
+        {Object.entries(stim.effectsDamage).map(([key, effect]) => (
+          <div key={key} className="card p-3 mb-3 bg-tarkov-bg border border-tarkov-border">
+            <div className="flex items-center justify-between mb-3">
+              <span className="text-xs font-semibold text-tarkov-text-dim uppercase">{key}</span>
+              <button className="btn-danger text-xs flex items-center gap-1" onClick={() => removeDamageEffect(key)}>
+                <Trash2 size={14} /> Remove
+              </button>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+              <Field label="Value" tooltip="Magnitude of the damage effect.">
+                <input className="input-field" type="number" value={effect.value ?? ''} onChange={e => updateDamageEffect(key, { value: e.target.value === '' ? undefined : parseFloat(e.target.value) })} />
+              </Field>
+              <Field label="Delay (s)" tooltip="Seconds before the effect starts.">
+                <input className="input-field" type="number" min={0} value={effect.delay ?? ''} onChange={e => updateDamageEffect(key, { delay: e.target.value === '' ? undefined : parseFloat(e.target.value) })} />
+              </Field>
+              <Field label="Duration (s)" tooltip="How long the effect lasts.">
+                <input className="input-field" type="number" min={0} value={effect.duration ?? ''} onChange={e => updateDamageEffect(key, { duration: e.target.value === '' ? undefined : parseFloat(e.target.value) })} />
+              </Field>
+              <Field label="Fade Out (s)" tooltip="Fade out duration of the effect.">
+                <input className="input-field" type="number" min={0} value={effect.fadeOut ?? ''} onChange={e => updateDamageEffect(key, { fadeOut: e.target.value === '' ? undefined : parseFloat(e.target.value) })} />
+              </Field>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mt-3">
+              <Field label="Cost" tooltip="HP resource cost to remove the effect.">
+                <input className="input-field" type="number" min={0} value={effect.cost ?? ''} onChange={e => updateDamageEffect(key, { cost: e.target.value === '' ? undefined : parseFloat(e.target.value) })} />
+              </Field>
+              <Field label="Health Penalty Min" tooltip="Minimum health penalty.">
+                <input className="input-field" type="number" value={effect.healthPenaltyMin ?? ''} onChange={e => updateDamageEffect(key, { healthPenaltyMin: e.target.value === '' ? undefined : parseFloat(e.target.value) })} />
+              </Field>
+              <Field label="Health Penalty Max" tooltip="Maximum health penalty.">
+                <input className="input-field" type="number" value={effect.healthPenaltyMax ?? ''} onChange={e => updateDamageEffect(key, { healthPenaltyMax: e.target.value === '' ? undefined : parseFloat(e.target.value) })} />
               </Field>
             </div>
           </div>
