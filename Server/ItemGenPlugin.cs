@@ -9,6 +9,7 @@ using ItemGen.Generators;
 using ItemGen.Models;
 using ItemGen.Services;
 using ItemGen.Validation;
+using System.Text.Json;
 
 namespace ItemGen;
 
@@ -85,6 +86,9 @@ public class ItemGenPlugin(
             // Register custom keys
             KeyGenerator.RegisterAll(customItemService, databaseService, enabledKeys, logger);
 
+            // Write door-key mappings so the client can patch doors at runtime
+            WriteDoorKeyMappings(configPath, enabledKeys);
+
             // Register custom containers
             ContainerGenerator.RegisterAll(customItemService, databaseService, enabledContainers, logger);
 
@@ -104,5 +108,48 @@ public class ItemGenPlugin(
         }
 
         return Task.CompletedTask;
+    }
+
+    private void WriteDoorKeyMappings(string configPath, List<KeyDefinition> keys)
+    {
+        var modDir = Path.GetDirectoryName(Path.GetDirectoryName(configPath));
+        if (string.IsNullOrEmpty(modDir))
+        {
+            logger.LogWithColor("[ItemGen] Could not determine mod directory for door-key mappings.", LogTextColor.Yellow);
+            return;
+        }
+
+        Directory.CreateDirectory(modDir);
+        var doorsJsonPath = Path.Combine(modDir, "doors.json");
+
+        var mapping = new Dictionary<string, List<string>>();
+        foreach (var key in keys)
+        {
+            foreach (var doorId in key.DoorIds)
+            {
+                if (string.IsNullOrWhiteSpace(doorId))
+                    continue;
+
+                if (!mapping.TryGetValue(doorId, out var keyIds))
+                {
+                    keyIds = new List<string>();
+                    mapping[doorId] = keyIds;
+                }
+
+                if (!keyIds.Contains(key.Id))
+                    keyIds.Add(key.Id);
+            }
+        }
+
+        try
+        {
+            var json = JsonSerializer.Serialize(mapping, new JsonSerializerOptions { WriteIndented = true });
+            File.WriteAllText(doorsJsonPath, json);
+            logger.LogWithColor($"[ItemGen] Wrote {mapping.Count} door-key mapping(s) to {doorsJsonPath}", LogTextColor.Green);
+        }
+        catch (Exception ex)
+        {
+            logger.LogWithColor($"[ItemGen] Failed to write door-key mappings: {ex.Message}", LogTextColor.Red);
+        }
     }
 }

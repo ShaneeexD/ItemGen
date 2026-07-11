@@ -1,6 +1,7 @@
 using System;
 using System.Collections;
 using BepInEx;
+using BepInEx.Logging;
 using Comfort.Common;
 using EFT;
 using HarmonyLib;
@@ -8,22 +9,26 @@ using UnityEngine;
 
 namespace ItemGen.Client
 {
-    [BepInPlugin("com.serenity.itemgen", "ItemGen Client", "1.0.0")]
+    [BepInPlugin("com.serenity.itemgen", "ItemGen Client", "1.1.0")]
     public class Plugin : BaseUnityPlugin
     {
+        public static ManualLogSource Log { get; private set; }
+
         private void Awake()
         {
+            Log = Logger;
             try
             {
-                BundleInjector.Init(Logger);
+                BundleInjector.Init(Log);
+                DoorKeyPatch.Load();
                 var harmony = new Harmony("com.serenity.itemgen");
                 harmony.PatchAll();
                 StartCoroutine(InjectWhenReady());
-                Logger.LogInfo("ItemGen client loaded.");
+                Log.LogInfo("ItemGen client loaded.");
             }
             catch (Exception ex)
             {
-                Logger.LogError($"ItemGen client failed to load: {ex}");
+                Log.LogError($"ItemGen client failed to load: {ex}");
             }
         }
 
@@ -31,7 +36,7 @@ namespace ItemGen.Client
         {
             yield return new WaitUntil(() => Singleton<IEasyAssets>.Instance != null);
             BundleInjector.InjectAll();
-            Logger.LogInfo("All ItemGen bundles fully loaded.");
+            Log.LogInfo("All ItemGen bundles fully loaded.");
         }
     }
 
