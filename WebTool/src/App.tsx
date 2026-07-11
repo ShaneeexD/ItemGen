@@ -1571,16 +1571,16 @@ function StimSpecifics({ stim, onChange }: StimSpecificsProps) {
                 )}
               </Field>
               <Field label="Value" tooltip="Positive for buff, negative for nerf. For EnergyRate/HydrationRate, negative drains hunger/thirst over time.">
-                <input className="input-field" type="number" value={buff.value} onChange={e => updateBuff(i, { value: parseInt(e.target.value) || 0 })} />
+                <input className="input-field" type="number" step="0.01" value={buff.value} onChange={e => updateBuff(i, { value: parseFloat(e.target.value) || 0 })} />
               </Field>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-4 gap-3 mt-3">
               <Field label="Delay (s)" tooltip="Seconds before the buff starts.">
-                <input className="input-field" type="number" min={0} value={buff.delay} onChange={e => updateBuff(i, { delay: parseInt(e.target.value) || 0 })} />
+                <input className="input-field" type="number" min={0} step="0.01" value={buff.delay} onChange={e => updateBuff(i, { delay: parseFloat(e.target.value) || 0 })} />
               </Field>
               <Field label="Duration (s)" tooltip="How long the buff lasts.">
-                <input className="input-field" type="number" min={0} value={buff.duration} onChange={e => updateBuff(i, { duration: parseInt(e.target.value) || 0 })} />
+                <input className="input-field" type="number" min={0} step="0.01" value={buff.duration} onChange={e => updateBuff(i, { duration: parseFloat(e.target.value) || 0 })} />
               </Field>
               <Field label="Chance" tooltip="0-1 chance for the buff to apply.">
                 <input className="input-field" type="number" min={0} max={1} step="0.01" value={buff.chance} onChange={e => updateBuff(i, { chance: parseFloat(e.target.value) || 0 })} />

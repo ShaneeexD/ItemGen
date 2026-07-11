@@ -182,12 +182,12 @@ public static class StimGenerator
                 buffs = def.CustomBuffs.Select(b => new Buff
                 {
                     BuffType = b.BuffType,
-                    Chance = (float)b.Chance,
-                    Delay = (float)b.Delay,
-                    Duration = (float)b.Duration,
-                    Value = (float)b.Value,
+                    Chance = b.Chance,
+                    Delay = b.Delay,
+                    Duration = b.Duration,
+                    Value = b.Value,
                     AbsoluteValue = b.AbsoluteValue,
-                    SkillName = b.SkillName,
+                    SkillName = b.BuffType == "SkillRate" ? b.SkillName! : null!,
                 }).ToList();
             }
             else if (!string.IsNullOrWhiteSpace(def.StimulatorBuffs) && TryGetExistingBuffs(stimulatorBuffs, def.StimulatorBuffs, out var existingBuffs))

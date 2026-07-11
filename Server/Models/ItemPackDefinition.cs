@@ -41,13 +41,13 @@ public class StimBuff
     public string SkillName { get; set; } = string.Empty;
 
     [JsonPropertyName("value")]
-    public int Value { get; set; }
+    public float Value { get; set; }
 
     [JsonPropertyName("delay")]
-    public int Delay { get; set; } = 1;
+    public float Delay { get; set; } = 1;
 
     [JsonPropertyName("duration")]
-    public int Duration { get; set; } = 300;
+    public float Duration { get; set; } = 300;
 
     [JsonPropertyName("chance")]
     public float Chance { get; set; } = 1;

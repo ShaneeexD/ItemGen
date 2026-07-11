@@ -22,51 +22,59 @@ namespace ItemGen.Client
         static MethodBase TargetMethod()
         {
             var baseType = typeof(ActiveHealthController).BaseType;
-            return AccessTools.Method(baseType, "TryGetBodyPartToApply");
+            return AccessTools.Method(baseType, "method_7");
+        }
+
+        private static T GetItemComponent<T>(Item item) where T : class
+        {
+            var componentsObject = Traverse.Create(item).Field("Components").GetValue();
+            if (!(componentsObject is System.Collections.IEnumerable components))
+            {
+                return null;
+            }
+
+            foreach (var component in components)
+            {
+                if (component is T typed)
+                {
+                    return typed;
+                }
+            }
+
+            return null;
         }
 
         private static readonly Type GClass3009Type = typeof(ActiveHealthController).BaseType;
         private static readonly MethodInfo Method_9 = AccessTools.Method(GClass3009Type, "method_9");
 
-        private static readonly Func<object, HealthEffectsComponent, MedKitComponent, EBodyPart, EBodyPart?> Method_9Delegate;
-
-        static StimEffectsDamagePatch()
-        {
-            if (Method_9 != null)
-            {
-                Method_9Delegate = AccessTools.MethodDelegate<Func<object, HealthEffectsComponent, MedKitComponent, EBodyPart, EBodyPart?>>(Method_9);
-            }
-        }
-
-        static bool Prefix(
+        static void Postfix(
             ref bool __result,
             object __instance,
             Item item,
             EBodyPart bodyPart,
-            out EBodyPart? damagedBodyPart)
+            bool fastSearch,
+            ref EBodyPart? damagedBodyPart)
         {
-            damagedBodyPart = null;
-
-            if (Method_9Delegate == null)
+            if (!__result)
             {
-                return true;
+                return;
             }
 
             if (!(item is MedsItemClass))
             {
-                return true;
+                return;
             }
 
-            var healthEffects = item.GetItemComponent<HealthEffectsComponent>();
+            var healthEffects = GetItemComponent<HealthEffectsComponent>(item);
             if (healthEffects == null)
             {
-                return true;
+                return;
             }
 
             var damageEffects = healthEffects.DamageEffects;
             if (damageEffects == null || damageEffects.Count == 0)
             {
-                return true;
+                return;
             }
 
             // If there are no stimulator buffs, the original code already falls through to
@@ -74,20 +82,166 @@ namespace ItemGen.Client
             // otherwise force the effect onto Head.
             if (string.IsNullOrEmpty(healthEffects.StimulatorBuffs))
             {
-                return true;
+                return;
             }
 
-            var medKit = item.GetItemComponent<MedKitComponent>();
-            var bestBodyPart = Method_9Delegate(__instance, healthEffects, medKit, bodyPart);
+            var medKit = GetItemComponent<MedKitComponent>(item);
+            var bestBodyPart = FindBestBodyPart(__instance, healthEffects, medKit, bodyPart, damageEffects);
 
             if (bestBodyPart.HasValue)
             {
                 damagedBodyPart = bestBodyPart.Value;
                 __result = true;
+            }
+            else
+            {
+                damagedBodyPart = null;
+                __result = false;
+            }
+        }
+
+        private static EBodyPart? FindBestBodyPart(
+            object healthController,
+            HealthEffectsComponent healthEffects,
+            MedKitComponent medKit,
+            EBodyPart bodyPart,
+            Dictionary<EDamageEffectType, GClass1443> damageEffects)
+        {
+            if (Method_9 != null)
+            {
+                try
+                {
+                    return (EBodyPart?)Method_9.Invoke(healthController, new object[] { healthEffects, medKit, bodyPart });
+                }
+                catch
+                {
+                    // Fall through to manual fallback.
+                }
+            }
+
+            var controllerType = healthController.GetType();
+            var baseType = controllerType.BaseType;
+            if (baseType != null)
+            {
+                var method = baseType.GetMethod("method_9", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
+                if (method != null)
+                {
+                    try
+                    {
+                        return (EBodyPart?)method.Invoke(healthController, new object[] { healthEffects, medKit, bodyPart });
+                    }
+                    catch
+                    {
+                        // ignored
+                    }
+                }
+            }
+
+            return ManualFindBestBodyPart(healthController, healthEffects, medKit, bodyPart, damageEffects);
+        }
+
+        private static readonly IReadOnlyList<EBodyPart> RealBodyParts =
+            Traverse.Create(typeof(GClass3058)).Field("RealBodyParts").GetValue<IReadOnlyList<EBodyPart>>();
+
+        private static readonly MethodInfo IsBodyPartDestroyedMethod =
+            AccessTools.Method(typeof(ActiveHealthController), "IsBodyPartDestroyed");
+
+        private static readonly MethodInfo FindActiveEffectGeneric =
+            AccessTools.Method(typeof(ActiveHealthController), "FindActiveEffect");
+
+        private static readonly Type FractureType =
+            typeof(ActiveHealthController).GetNestedType("Fracture", BindingFlags.Public | BindingFlags.NonPublic);
+
+        private static readonly Type HeavyBleedingType =
+            typeof(ActiveHealthController).GetNestedType("HeavyBleeding", BindingFlags.Public | BindingFlags.NonPublic);
+
+        private static readonly Type LightBleedingType =
+            typeof(ActiveHealthController).GetNestedType("LightBleeding", BindingFlags.Public | BindingFlags.NonPublic);
+
+        private static EBodyPart? ManualFindBestBodyPart(
+            object healthController,
+            HealthEffectsComponent healthEffects,
+            MedKitComponent medKit,
+            EBodyPart bodyPart,
+            Dictionary<EDamageEffectType, GClass1443> damageEffects)
+        {
+            IEnumerable<EBodyPart> partsToCheck;
+            if (bodyPart != EBodyPart.Common)
+            {
+                partsToCheck = new[] { bodyPart };
+            }
+            else
+            {
+                partsToCheck = RealBodyParts;
+            }
+
+            foreach (var part in partsToCheck)
+            {
+                if (IsCandidateBodyPart(part, healthController, medKit, damageEffects))
+                {
+                    return part;
+                }
+            }
+
+            return null;
+        }
+
+        private static bool IsCandidateBodyPart(
+            EBodyPart partToCheck,
+            object healthController,
+            MedKitComponent medKit,
+            Dictionary<EDamageEffectType, GClass1443> damageEffects)
+        {
+            if (damageEffects.TryGetValue(EDamageEffectType.DestroyedPart, out var destroyedPart))
+            {
+                if (partToCheck != EBodyPart.Head && partToCheck != EBodyPart.Chest)
+                {
+                    bool isDestroyed = (bool)IsBodyPartDestroyedMethod.Invoke(healthController, new object[] { partToCheck });
+                    if (isDestroyed && (medKit == null || medKit.HpResource >= (float)destroyedPart.Cost))
+                    {
+                        return true;
+                    }
+                }
+            }
+
+            if (EffectActive(EDamageEffectType.Fracture, FractureType, partToCheck, healthController, medKit, damageEffects))
+            {
+                return true;
+            }
+
+            if (EffectActive(EDamageEffectType.HeavyBleeding, HeavyBleedingType, partToCheck, healthController, medKit, damageEffects))
+            {
+                return true;
+            }
+
+            if (EffectActive(EDamageEffectType.LightBleeding, LightBleedingType, partToCheck, healthController, medKit, damageEffects))
+            {
+                return true;
+            }
+
+            return false;
+        }
+
+        private static bool EffectActive(
+            EDamageEffectType effectType,
+            Type effectClassType,
+            EBodyPart partToCheck,
+            object healthController,
+            MedKitComponent medKit,
+            Dictionary<EDamageEffectType, GClass1443> damageEffects)
+        {
+            if (effectClassType == null || !damageEffects.TryGetValue(effectType, out var effectProps))
+            {
                 return false;
             }
 
-            return true;
+            if (medKit != null && medKit.HpResource < (float)effectProps.Cost)
+            {
+                return false;
+            }
+
+            var findMethod = FindActiveEffectGeneric.MakeGenericMethod(effectClassType);
+            return findMethod.Invoke(healthController, new object[] { partToCheck }) != null;
         }
     }
 
