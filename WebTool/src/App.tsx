@@ -302,7 +302,7 @@ function buildExportJson(pack: ItemPackDefinition): string {
     })),
     containers: pack.containers.map(c => ({
       ...c,
-      properties: cleanProperties(c.properties || {}, ['Prefab', 'UsePrefab', 'Grids']),
+      properties: cleanProperties(c.properties || {}, ['Prefab', 'UsePrefab', 'Grids', 'Width', 'Height', 'StackMaxSize', 'ItemSound', 'CanPutIntoDuringTheRaid', 'HideEntrails', 'ExaminedByDefault']),
     })),
     stims: pack.stims.map(s => ({
       ...s,
