@@ -5,6 +5,8 @@ import { saveAs } from 'file-saver'
 import {
   AlertCircle,
   ArrowUp,
+  ChevronDown,
+  ChevronRight,
   Copy,
   Download,
   ExternalLink,
@@ -59,10 +61,13 @@ import {
 import { QUEST_TEMPLATES } from './generated_quest_templates'
 import { KEY_TEMPLATES } from './generated_key_templates'
 import { CONTAINER_TEMPLATES } from './generated_container_templates'
+import { SECURE_CONTAINER_TEMPLATES } from './generated_secure_container_templates'
 import { STIM_TEMPLATES } from './generated_stim_templates'
 import { MEDKIT_TEMPLATES } from './generated_medkit_templates'
 import apiItemNames from '../api_item_names.json'
 import { VanillaBundlesPanel } from './VanillaBundlesPanel'
+
+const ALL_CONTAINER_TEMPLATES = [...CONTAINER_TEMPLATES, ...SECURE_CONTAINER_TEMPLATES]
 
 type Tab = 'quest' | 'key' | 'container' | 'stim' | 'medkit'
 type Mode = 'items' | 'traders' | 'bundles' | 'vanilla-bundles'
@@ -258,31 +263,28 @@ function validatePack(pack: ItemPackDefinition): ValidationError[] {
   return errors
 }
 
-function cleanProperties(props: Record<string, any>, allowed: string[], defaults?: Record<string, any>): Record<string, any> {
+function sanitizeProperties(props: Record<string, any>): Record<string, any> {
   const next: Record<string, any> = {}
-  for (const key of allowed) {
-    const value = props[key] ?? defaults?.[key]
-    if (value !== undefined) {
-      if (key === 'Prefab' || key === 'UsePrefab') {
-        const path = value?.path
-        if (path) {
-          next[key] = { path, rcid: value?.rcid ?? '' }
-        }
-      } else if (key === 'Grids' && Array.isArray(value)) {
-        next[key] = value.map(grid => ({
-          ...grid,
-          _props: {
-            ...grid._props,
-            filters: grid._props?.filters?.map((f: any) => ({
-              ...f,
-              Filter: f.Filter?.filter(Boolean) ?? [],
-              ExcludedFilter: f.ExcludedFilter?.filter(Boolean) ?? [],
-            })) ?? grid._props?.filters,
-          },
-        }))
-      } else {
-        next[key] = JSON.parse(JSON.stringify(value))
-      }
+  for (const [key, value] of Object.entries(props)) {
+    if (value === undefined) {
+      continue
+    }
+    if ((key === 'Prefab' || key === 'UsePrefab') && value?.path) {
+      next[key] = { path: value.path, rcid: value.rcid ?? '' }
+    } else if (key === 'Grids' && Array.isArray(value)) {
+      next[key] = value.map(grid => ({
+        ...grid,
+        _props: {
+          ...grid._props,
+          filters: grid._props?.filters?.map((f: any) => ({
+            ...f,
+            Filter: f.Filter?.filter(Boolean) ?? [],
+            ExcludedFilter: f.ExcludedFilter?.filter(Boolean) ?? [],
+          })) ?? grid._props?.filters,
+        },
+      }))
+    } else {
+      next[key] = JSON.parse(JSON.stringify(value))
     }
   }
   return next
@@ -295,22 +297,72 @@ function buildExportJson(pack: ItemPackDefinition): string {
     questItems: pack.questItems.map(q => ({
       ...q,
       questIds: q.questIds.filter(Boolean),
+      properties: sanitizeProperties(q.properties || {}),
     })),
     keys: pack.keys.map(k => ({
       ...k,
       doorIds: k.doorIds.filter(Boolean),
-      properties: cleanProperties(k.properties || {}, ['Prefab', 'UsePrefab']),
+      properties: sanitizeProperties(k.properties || {}),
     })),
     containers: pack.containers.map(c => ({
       ...c,
-      properties: cleanProperties(c.properties || {}, ['Prefab', 'UsePrefab', 'Grids', 'Width', 'Height', 'StackMaxSize', 'ItemSound', 'CanPutIntoDuringTheRaid', 'HideEntrails', 'ExaminedByDefault']),
+      properties: sanitizeProperties(c.properties || {}),
     })),
     stims: pack.stims.map(s => ({
       ...s,
-      properties: cleanProperties(s.properties || {}, ['Prefab', 'UsePrefab', 'StimulatorBuffs'], { StimulatorBuffs: '' }),
+      properties: sanitizeProperties(s.properties || {}),
+    })),
+    medkits: pack.medkits.map(m => ({
+      ...m,
+      properties: sanitizeProperties(m.properties || {}),
     })),
   }
   return JSON.stringify(cleaned, null, 2)
+}
+
+function RawPropertiesPanel({ properties, onChange, title = 'Raw Properties JSON' }: { properties: Record<string, any>; onChange: (properties: Record<string, any>) => void; title?: string }) {
+  const [expanded, setExpanded] = useState(false)
+  const [rawProps, setRawProps] = useState(JSON.stringify(properties || {}, null, 2))
+  const [rawError, setRawError] = useState<string | null>(null)
+
+  useEffect(() => {
+    setRawProps(JSON.stringify(properties || {}, null, 2))
+    setRawError(null)
+  }, [properties])
+
+  const apply = () => {
+    try {
+      const parsed = JSON.parse(rawProps)
+      onChange(parsed)
+      setRawError(null)
+    } catch (e) {
+      setRawError((e as Error).message)
+    }
+  }
+
+  return (
+    <div className="mt-6 border-t border-tarkov-border pt-4">
+      <button type="button" onClick={() => setExpanded(v => !v)} className="flex items-center gap-2 text-sm font-semibold text-tarkov-text hover:text-tarkov-accent">
+        {expanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+        {title}
+      </button>
+      {expanded && (
+        <div className="mt-2">
+          <p className="text-xs text-tarkov-text-dim mb-2">
+            Edit the full properties object. Any field you add here will be merged into the generated item.
+          </p>
+          <textarea
+            className="input-field min-h-[200px] resize-y font-mono text-xs"
+            value={rawProps}
+            onChange={e => setRawProps(e.target.value)}
+            onBlur={apply}
+            spellCheck={false}
+          />
+          {rawError && <div className="text-xs text-tarkov-error mt-2">{rawError}</div>}
+        </div>
+      )}
+    </div>
+  )
 }
 
 function downloadJson(pack: ItemPackDefinition) {
@@ -664,6 +716,7 @@ export default function App() {
           weight: template.weight,
           backgroundColor: template.backgroundColor,
           stackMaxSize: template.stackMaxSize,
+          properties: template.properties ?? {},
         } : {}),
       })
     } else if (tab === 'key') {
@@ -680,7 +733,6 @@ export default function App() {
     } else if (tab === 'stim') {
       const template = STIM_TEMPLATES.find(t => t.id === templateId)
       const props = template?.properties ?? {}
-      const cleanProps = { ...props, Prefab: { ...props.Prefab, path: '' }, UsePrefab: { ...props.UsePrefab, path: '' }, StimulatorBuffs: '', effects_health: {}, effects_damage: {}, BodyPartPriority: [], foodEffectType: '' }
       updateItem(selectedIndex, {
         ...baseUpdates,
         weight: template?.weight ?? (typeof props.Weight === 'number' ? props.Weight : 0.05),
@@ -700,12 +752,11 @@ export default function App() {
         customBuffs: template?.customBuffs ?? [],
         effectsHealth: template?.effectsHealth ?? {},
         effectsDamage: template?.effectsDamage ?? {},
-        properties: cleanProps,
+        properties: props,
       } as Partial<StimDefinition>)
     } else if (tab === 'medkit') {
       const template = MEDKIT_TEMPLATES.find(t => t.id === templateId)
       const props = template?.properties ?? {}
-      const cleanProps = { ...props, Prefab: { ...props.Prefab, path: '' }, UsePrefab: { ...props.UsePrefab, path: '' }, StimulatorBuffs: '', effects_health: {}, effects_damage: {}, BodyPartPriority: [], foodEffectType: '' }
       updateItem(selectedIndex, {
         ...baseUpdates,
         weight: template?.weight ?? (typeof props.Weight === 'number' ? props.Weight : 0.5),
@@ -725,10 +776,10 @@ export default function App() {
         customBuffs: [],
         effectsHealth: template?.effectsHealth ?? {},
         effectsDamage: template?.effectsDamage ?? {},
-        properties: cleanProps,
+        properties: props,
       } as Partial<MedKitDefinition>)
     } else {
-      const template = CONTAINER_TEMPLATES.find(t => t.id === templateId)
+      const template = ALL_CONTAINER_TEMPLATES.find(t => t.id === templateId)
       const props = template?.properties ?? {}
       updateItem(selectedIndex, {
         ...baseUpdates,
@@ -1052,6 +1103,8 @@ export default function App() {
                     <div className="mt-3 text-sm text-tarkov-text-dim bg-tarkov-bg border border-tarkov-border rounded p-3">
                       <span className="text-tarkov-accent font-semibold">Note:</span> The server sets <span className="font-mono">QuestItem = true</span> on this item so it behaves exactly like a vanilla EFT quest inventory item.
                     </div>
+
+                    <RawPropertiesPanel properties={(selectedItem as QuestItemDefinition).properties || {}} onChange={next => updateItem(selectedIndex, { properties: next })} />
                   </Section>
                 )}
 
@@ -1085,6 +1138,8 @@ export default function App() {
                     <div className="mt-3 text-sm text-tarkov-text-dim bg-tarkov-bg border border-tarkov-border rounded p-3">
                       <span className="text-tarkov-accent font-semibold">Note:</span> Door IDs should be vanilla EFT door IDs. Custom doors added by mods such as Map Editor Lite can have the key ID set in the editor, and Map Editor Lite can also dump door IDs while in raid.
                     </div>
+
+                    <RawPropertiesPanel properties={(selectedItem as KeyDefinition).properties} onChange={next => updateItem(selectedIndex, { properties: next })} />
                   </Section>
                 )}
 
@@ -1197,7 +1252,7 @@ function getTemplateName(id: string, tab: Tab): string {
     const t = MEDKIT_TEMPLATES.find(x => x.id === id)
     return t ? t.displayName : ''
   }
-  const t = CONTAINER_TEMPLATES.find(x => x.id === id)
+  const t = ALL_CONTAINER_TEMPLATES.find(x => x.id === id)
   return t ? t.displayName : ''
 }
 
@@ -1218,7 +1273,7 @@ function getTemplateParent(id: string, tab: Tab): string {
     const t = MEDKIT_TEMPLATES.find(x => x.id === id)
     return t ? t.parent : ''
   }
-  const t = CONTAINER_TEMPLATES.find(x => x.id === id)
+  const t = ALL_CONTAINER_TEMPLATES.find(x => x.id === id)
   return t ? t.parent : ''
 }
 
@@ -1772,6 +1827,8 @@ function StimSpecifics({ stim, onChange, mode = 'stim' }: StimSpecificsProps) {
           </div>
         ))}
       </div>
+
+      <RawPropertiesPanel properties={props} onChange={next => onChange({ properties: next })} />
     </Section>
   )
 }
@@ -1827,6 +1884,9 @@ function ContainerSpecifics({ container, onChange }: ContainerSpecificsProps) {
         </Field>
         <Field label="Examined By Default" tooltip="Whether the item starts examined for the player.">
           <Toggle checked={props.ExaminedByDefault ?? true} onChange={v => updateProp('ExaminedByDefault', v)} />
+        </Field>
+        <Field label="Is Secure Container" tooltip="If enabled, this container behaves like a secure container (items are not lost on death).">
+          <Toggle checked={props.isSecured ?? false} onChange={v => updateProp('isSecured', v)} />
         </Field>
       </div>
 
@@ -1898,6 +1958,8 @@ function ContainerSpecifics({ container, onChange }: ContainerSpecificsProps) {
           Default vanilla IDs: Alpha 544a11ac4bdc2d470e8b456a, Beta 5857a8b324597729ab0a0e7d, Gamma 5857a8bc2459772bad15db29, Epsilon 59db794186f77448bc595262, Kappa 5c093ca986f7740a1867ab12, Theta 664a55d84a90fc2c8a6305c9, Waist pouch 60b0f9326c1d6c524c5ce3d5
         </div>
       </div>
+
+      <RawPropertiesPanel properties={props} onChange={next => onChange({ properties: next })} />
 
     </Section>
   )

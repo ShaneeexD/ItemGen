@@ -1,5 +1,9 @@
 # Changelog
 
+## v1.2.2
+- **Custom secure containers** — container editor now has an `isSecured` toggle and a raw `properties` JSON editor. Secure containers can be chosen as base templates and their `isSecured` value is preserved.
+- **Raw property preservation** — all item generators now merge raw `properties` from the pack into the generated item, so any extra JSON values are respected instead of dropped.
+
 ## v1.2.1
 - **Client-side icon scaling** — custom items now render their inventory icon at the size defined by `Width`/`Height`, preventing oversized icons from overlapping adjacent slots.
 

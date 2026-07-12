@@ -237,6 +237,9 @@ public class QuestItemDefinition : ItemDefinition
 
     [JsonPropertyName("questIds")]
     public List<string> QuestIds { get; set; } = [];
+
+    [JsonPropertyName("properties")]
+    public JsonElement Properties { get; set; }
 }
 
 public class KeyDefinition : ItemDefinition

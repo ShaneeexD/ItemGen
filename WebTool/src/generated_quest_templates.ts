@@ -9,6 +9,7 @@ export interface QuestTemplate {
   height: number
   stackMaxSize: number
   prefab: string
+  properties?: Record<string, any>
 }
 
 export const QUEST_TEMPLATES: QuestTemplate[] = [

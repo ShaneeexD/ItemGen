@@ -34,6 +34,7 @@ export interface ItemDefinition {
 export interface QuestItemDefinition extends ItemDefinition {
   stackMaxSize: number
   questIds: string[]
+  properties: Record<string, any>
 }
 
 export interface KeyDefinition extends ItemDefinition {
@@ -145,6 +146,7 @@ export function createDefaultQuestItem(): QuestItemDefinition {
     canSellOnRagfair: false,
     stackMaxSize: 1,
     questIds: [],
+    properties: {},
   }
 }
 

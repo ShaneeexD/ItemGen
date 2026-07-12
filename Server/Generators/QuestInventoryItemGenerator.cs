@@ -1,6 +1,8 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
+using System.Text.Json;
+using System.Text.Json.Serialization;
 using SPTarkov.Server.Core.Models.Common;
 using SPTarkov.Server.Core.Models.Eft.Common;
 using SPTarkov.Server.Core.Models.Eft.Common.Tables;
@@ -9,6 +11,7 @@ using SPTarkov.Server.Core.Models.Spt.Mod;
 using SPTarkov.Server.Core.Models.Utils;
 using SPTarkov.Server.Core.Services;
 using SPTarkov.Server.Core.Services.Mod;
+using ItemGen.Converters;
 using ItemGen.Models;
 
 namespace ItemGen.Generators;
@@ -43,18 +46,26 @@ public static class QuestInventoryItemGenerator
         var parentId = ResolveParentId(databaseService, def.BaseTpl);
         var handbookParentId = ResolveHandbookParent(databaseService, def.BaseTpl);
 
-        var overrides = new TemplateItemProperties
+        TemplateItemProperties? overrides = null;
+        if (def.Properties.ValueKind != JsonValueKind.Undefined && def.Properties.ValueKind != JsonValueKind.Null)
         {
-            Name = def.ShortName,
-            ShortName = def.ShortName,
-            Description = def.Description,
-            Weight = def.Weight,
-            BackgroundColor = string.IsNullOrWhiteSpace(def.BackgroundColor) ? null : def.BackgroundColor,
-            StackMaxSize = def.StackMaxSize,
-            QuestItem = true,
-            CanSellOnRagfair = def.CanSellOnRagfair,
-            RarityPvE = def.RarityPvE,
-        };
+            overrides = JsonSerializer.Deserialize<TemplateItemProperties>(def.Properties.GetRawText(), new JsonSerializerOptions
+            {
+                Converters = { new MongoIdJsonConverter(), new JsonStringEnumConverter() },
+            });
+        }
+
+        overrides ??= new TemplateItemProperties();
+
+        overrides.Name = def.ShortName;
+        overrides.ShortName = def.ShortName;
+        overrides.Description = def.Description;
+        overrides.Weight = def.Weight;
+        overrides.BackgroundColor = string.IsNullOrWhiteSpace(def.BackgroundColor) ? null : def.BackgroundColor;
+        overrides.StackMaxSize = def.StackMaxSize;
+        overrides.QuestItem = true;
+        overrides.CanSellOnRagfair = def.CanSellOnRagfair;
+        overrides.RarityPvE = def.RarityPvE;
 
         var details = new NewItemFromCloneDetails
         {

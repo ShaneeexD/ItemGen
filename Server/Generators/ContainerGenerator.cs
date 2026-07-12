@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using ItemGen.Converters;
 using SPTarkov.Server.Core.Models.Common;
 using SPTarkov.Server.Core.Models.Eft.Common;
@@ -50,7 +51,7 @@ public static class ContainerGenerator
         {
             overrides = JsonSerializer.Deserialize<TemplateItemProperties>(def.Properties.GetRawText(), new JsonSerializerOptions
             {
-                Converters = { new MongoIdJsonConverter() },
+                Converters = { new MongoIdJsonConverter(), new JsonStringEnumConverter() },
             });
         }
 
@@ -100,26 +101,24 @@ public static class ContainerGenerator
 
             PatchSafeContainerFilters(databaseService, def, logger);
 
-            if (!string.IsNullOrWhiteSpace(customPrefabPath) || !string.IsNullOrWhiteSpace(customUsePrefabPath))
+            var items = databaseService.GetItems();
+            if (items.TryGetValue(def.Id, out var tpl) && tpl.Properties != null)
             {
-                var items = databaseService.GetItems();
-                if (items.TryGetValue(def.Id, out var tpl) && tpl.Properties != null)
+                if (!string.IsNullOrWhiteSpace(customPrefabPath) && tpl.Properties.Prefab != null)
                 {
-                    if (!string.IsNullOrWhiteSpace(customPrefabPath) && tpl.Properties.Prefab != null)
-                    {
-                        tpl.Properties.Prefab.Path = customPrefabPath;
-                    }
-                    if (!string.IsNullOrWhiteSpace(customUsePrefabPath) && tpl.Properties.UsePrefab != null)
-                    {
-                        tpl.Properties.UsePrefab.Path = customUsePrefabPath;
-                    }
+                    tpl.Properties.Prefab.Path = customPrefabPath;
                 }
-                else
+
+                if (!string.IsNullOrWhiteSpace(customUsePrefabPath) && tpl.Properties.UsePrefab != null)
                 {
-                    logger.LogWithColor(
-                        $"[ItemGen] Could not inject bundle path for container '{def.Name}' - item not found after clone.",
-                        LogTextColor.Yellow);
+                    tpl.Properties.UsePrefab.Path = customUsePrefabPath;
                 }
+            }
+            else
+            {
+                logger.LogWithColor(
+                    $"[ItemGen] Could not inject bundle path for container '{def.Name}' - item not found after clone.",
+                    LogTextColor.Yellow);
             }
         }
         else
