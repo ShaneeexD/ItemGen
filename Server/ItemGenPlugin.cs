@@ -84,28 +84,28 @@ public class ItemGenPlugin(
             logger.LogWithColor($"[ItemGen] Loaded {medkitDefinitions.Count} medkit definition(s), {enabledMedkits.Count} enabled.", LogTextColor.Cyan);
 
             // Register custom quest inventory items
-            QuestInventoryItemGenerator.RegisterAll(customItemService, databaseService, enabledQuestItems, logger);
+            var registeredQuestItems = QuestInventoryItemGenerator.RegisterAll(customItemService, databaseService, enabledQuestItems, logger);
 
             // Register custom keys
-            KeyGenerator.RegisterAll(customItemService, databaseService, enabledKeys, logger);
+            var registeredKeys = KeyGenerator.RegisterAll(customItemService, databaseService, enabledKeys, logger);
 
             // Write door-key mappings so the client can patch doors at runtime
             WriteDoorKeyMappings(configPath, enabledKeys);
 
             // Register custom containers
-            ContainerGenerator.RegisterAll(customItemService, databaseService, enabledContainers, logger);
+            var registeredContainers = ContainerGenerator.RegisterAll(customItemService, databaseService, enabledContainers, logger);
 
             // Register custom stims
-            StimGenerator.RegisterAll(customItemService, databaseService, enabledStims, logger);
+            var registeredStims = StimGenerator.RegisterAll(customItemService, databaseService, enabledStims, logger);
 
             // Register custom medkits
-            MedKitGenerator.RegisterAll(customItemService, databaseService, enabledMedkits, logger);
+            var registeredMedkits = MedKitGenerator.RegisterAll(customItemService, databaseService, enabledMedkits, logger);
 
             // Add custom items to trader assorts
-            TraderGenerator.RegisterAll(databaseService, packs.Select(p => p.Definition), logger);
+            var traderEntries = TraderGenerator.RegisterAll(databaseService, packs.Select(p => p.Definition), logger);
 
             logger.LogWithColor("[ItemGen] ====================================", LogTextColor.Cyan);
-            logger.LogWithColor($"[ItemGen] Done! Registered {enabledQuestItems.Count} custom quest item(s), {enabledKeys.Count} custom key(s), {enabledContainers.Count} custom container(s), {enabledStims.Count} custom stim(s) and {enabledMedkits.Count} custom medkit(s).", LogTextColor.Green);
+            logger.LogWithColor($"[ItemGen] Done! Registered {registeredQuestItems}/{enabledQuestItems.Count} custom quest item(s), {registeredKeys}/{enabledKeys.Count} custom key(s), {registeredContainers}/{enabledContainers.Count} custom container(s), {registeredStims}/{enabledStims.Count} custom stim(s), {registeredMedkits}/{enabledMedkits.Count} custom medkit(s), and {traderEntries} trader entry/entries.", LogTextColor.Green);
             logger.LogWithColor("[ItemGen] ====================================", LogTextColor.Cyan);
         }
         catch (Exception ex)

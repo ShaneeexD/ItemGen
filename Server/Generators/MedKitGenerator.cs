@@ -19,26 +19,32 @@ public static class MedKitGenerator
     private const string MedKitParentId = "5448f39d4bdc2d0a728b4568";
     private const string MedKitHandbookParentId = "5b47574386f77428ca22b338";
 
-    public static void RegisterAll(
+    public static int RegisterAll(
         CustomItemService customItemService,
         DatabaseService databaseService,
         IReadOnlyList<MedKitDefinition> definitions,
         ISptLogger<ItemGenPlugin> logger)
     {
+        var registered = 0;
         foreach (var def in definitions)
         {
             try
             {
-                RegisterMedKit(def, customItemService, databaseService, logger);
+                if (RegisterMedKit(def, customItemService, databaseService, logger))
+                {
+                    registered++;
+                }
             }
             catch (Exception ex)
             {
                 logger.LogWithColor($"[ItemGen] Failed to register medkit '{def.Name}': {ex.Message}", LogTextColor.Red);
             }
         }
+
+        return registered;
     }
 
-    private static void RegisterMedKit(
+    private static bool RegisterMedKit(
         MedKitDefinition def,
         CustomItemService customItemService,
         DatabaseService databaseService,
@@ -112,8 +118,6 @@ public static class MedKitGenerator
 
         if (result.Success == true)
         {
-            logger.LogWithColor($"[ItemGen] Registered medkit: {def.Name} ({def.Id})", LogTextColor.Green);
-
             var items = databaseService.GetItems();
             if (items.TryGetValue(def.Id, out var tpl) && tpl.Properties != null)
             {
@@ -133,13 +137,14 @@ public static class MedKitGenerator
                     $"[ItemGen] Could not inject bundle path for medkit '{def.Name}' - item not found after clone.",
                     LogTextColor.Yellow);
             }
+
+            return true;
         }
-        else
-        {
-            logger.LogWithColor(
-                $"[ItemGen] CreateItemFromClone reported failure for medkit '{def.Name}': {string.Join(", ", result.Errors ?? [])}",
-                LogTextColor.Yellow);
-        }
+
+        logger.LogWithColor(
+            $"[ItemGen] CreateItemFromClone reported failure for medkit '{def.Name}': {string.Join(", ", result.Errors ?? [])}",
+            LogTextColor.Yellow);
+        return false;
     }
 
     private static string? GetPropertyPath(JsonElement properties, string propertyName)

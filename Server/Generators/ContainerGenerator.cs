@@ -18,26 +18,41 @@ namespace ItemGen.Generators;
 
 public static class ContainerGenerator
 {
-    public static void RegisterAll(
+    public static int RegisterAll(
         CustomItemService customItemService,
         DatabaseService databaseService,
         IReadOnlyList<ContainerDefinition> definitions,
         ISptLogger<ItemGenPlugin> logger)
     {
+        var registered = 0;
+        var safeContainersPatched = 0;
         foreach (var def in definitions)
         {
             try
             {
-                RegisterContainer(def, customItemService, databaseService, logger);
+                var (success, patched) = RegisterContainer(def, customItemService, databaseService, logger);
+                if (success)
+                {
+                    registered++;
+                }
+
+                safeContainersPatched += patched;
             }
             catch (Exception ex)
             {
                 logger.LogWithColor($"[ItemGen] Failed to register container '{def.Name}': {ex.Message}", LogTextColor.Red);
             }
         }
+
+        if (safeContainersPatched > 0)
+        {
+            logger.LogWithColor($"[ItemGen] Patched {safeContainersPatched} safe container filter(s) across all containers.", LogTextColor.Green);
+        }
+
+        return registered;
     }
 
-    private static void RegisterContainer(
+    private static (bool success, int safeContainerPatches) RegisterContainer(
         ContainerDefinition def,
         CustomItemService customItemService,
         DatabaseService databaseService,
@@ -97,9 +112,7 @@ public static class ContainerGenerator
 
         if (result.Success == true)
         {
-            logger.LogWithColor($"[ItemGen] Registered container: {def.Name} ({def.Id})", LogTextColor.Green);
-
-            PatchSafeContainerFilters(databaseService, def, logger);
+            var patched = PatchSafeContainerFilters(databaseService, def, logger);
 
             var items = databaseService.GetItems();
             if (items.TryGetValue(def.Id, out var tpl) && tpl.Properties != null)
@@ -120,13 +133,14 @@ public static class ContainerGenerator
                     $"[ItemGen] Could not inject bundle path for container '{def.Name}' - item not found after clone.",
                     LogTextColor.Yellow);
             }
+
+            return (true, patched);
         }
-        else
-        {
-            logger.LogWithColor(
-                $"[ItemGen] CreateItemFromClone reported failure for container '{def.Name}': {string.Join(", ", result.Errors ?? [])}",
-                LogTextColor.Yellow);
-        }
+
+        logger.LogWithColor(
+            $"[ItemGen] CreateItemFromClone reported failure for container '{def.Name}': {string.Join(", ", result.Errors ?? [])}",
+            LogTextColor.Yellow);
+        return (false, 0);
     }
 
     private static readonly string[] DefaultSafeContainerIds =
@@ -141,7 +155,7 @@ public static class ContainerGenerator
         "60b0f9326c1d6c524c5ce3d5", // Waist pouch
     };
 
-    private static void PatchSafeContainerFilters(
+    private static int PatchSafeContainerFilters(
         DatabaseService databaseService,
         ContainerDefinition def,
         ISptLogger<ItemGenPlugin> logger)
@@ -149,7 +163,7 @@ public static class ContainerGenerator
         if (def.SafeContainerMode == SafeContainerMode.Include && def.SafeContainerIds.Count == 0)
         {
             logger.LogWithColor($"[ItemGen] Container '{def.Name}' has safeContainerMode 'include' but no IDs; skipping safe-container patch.", LogTextColor.Yellow);
-            return;
+            return 0;
         }
 
         var targetIds = def.SafeContainerMode switch
@@ -190,10 +204,7 @@ public static class ContainerGenerator
             patched++;
         }
 
-        if (patched > 0)
-        {
-            logger.LogWithColor($"[ItemGen] Patched {patched} safe container(s) to allow '{def.Name}'.", LogTextColor.Green);
-        }
+        return patched;
     }
 
     private static string? GetPropertyPath(JsonElement properties, string propertyName)

@@ -18,26 +18,32 @@ namespace ItemGen.Generators;
 
 public static class QuestInventoryItemGenerator
 {
-    public static void RegisterAll(
+    public static int RegisterAll(
         CustomItemService customItemService,
         DatabaseService databaseService,
         IReadOnlyList<QuestItemDefinition> definitions,
         ISptLogger<ItemGenPlugin> logger)
     {
+        var registered = 0;
         foreach (var def in definitions)
         {
             try
             {
-                RegisterQuestItem(def, customItemService, databaseService, logger);
+                if (RegisterQuestItem(def, customItemService, databaseService, logger))
+                {
+                    registered++;
+                }
             }
             catch (Exception ex)
             {
                 logger.LogWithColor($"[ItemGen] Failed to register quest item '{def.Name}': {ex.Message}", LogTextColor.Red);
             }
         }
+
+        return registered;
     }
 
-    private static void RegisterQuestItem(
+    private static bool RegisterQuestItem(
         QuestItemDefinition def,
         CustomItemService customItemService,
         DatabaseService databaseService,
@@ -91,15 +97,14 @@ public static class QuestInventoryItemGenerator
 
         if (result.Success == true)
         {
-            logger.LogWithColor($"[ItemGen] Registered quest item: {def.Name} ({def.Id})", LogTextColor.Green);
             ValidateLinkedQuests(def, databaseService, logger);
+            return true;
         }
-        else
-        {
-            logger.LogWithColor(
-                $"[ItemGen] CreateItemFromClone reported failure for quest item '{def.Name}': {string.Join(", ", result.Errors ?? [])}",
-                LogTextColor.Yellow);
-        }
+
+        logger.LogWithColor(
+            $"[ItemGen] CreateItemFromClone reported failure for quest item '{def.Name}': {string.Join(", ", result.Errors ?? [])}",
+            LogTextColor.Yellow);
+        return false;
     }
 
     private static void ValidateLinkedQuests(

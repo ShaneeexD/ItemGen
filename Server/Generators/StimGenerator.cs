@@ -19,26 +19,32 @@ public static class StimGenerator
 {
     private const string StimParentId = "5448f3a64bdc2d60728b456a";
 
-    public static void RegisterAll(
+    public static int RegisterAll(
         CustomItemService customItemService,
         DatabaseService databaseService,
         IReadOnlyList<StimDefinition> definitions,
         ISptLogger<ItemGenPlugin> logger)
     {
+        var registered = 0;
         foreach (var def in definitions)
         {
             try
             {
-                RegisterStim(def, customItemService, databaseService, logger);
+                if (RegisterStim(def, customItemService, databaseService, logger))
+                {
+                    registered++;
+                }
             }
             catch (Exception ex)
             {
                 logger.LogWithColor($"[ItemGen] Failed to register stim '{def.Name}': {ex.Message}", LogTextColor.Red);
             }
         }
+
+        return registered;
     }
 
-    private static void RegisterStim(
+    private static bool RegisterStim(
         StimDefinition def,
         CustomItemService customItemService,
         DatabaseService databaseService,
@@ -120,8 +126,6 @@ public static class StimGenerator
 
         if (result.Success == true)
         {
-            logger.LogWithColor($"[ItemGen] Registered stim: {def.Name} ({def.Id})", LogTextColor.Green);
-
             PatchStimulatorBuffs(databaseService, def, buffSetKey, logger);
 
             var items = databaseService.GetItems();
@@ -143,13 +147,14 @@ public static class StimGenerator
                     $"[ItemGen] Could not inject bundle path for stim '{def.Name}' - item not found after clone.",
                     LogTextColor.Yellow);
             }
+
+            return true;
         }
-        else
-        {
-            logger.LogWithColor(
-                $"[ItemGen] CreateItemFromClone reported failure for stim '{def.Name}': {string.Join(", ", result.Errors ?? [])}",
-                LogTextColor.Yellow);
-        }
+
+        logger.LogWithColor(
+            $"[ItemGen] CreateItemFromClone reported failure for stim '{def.Name}': {string.Join(", ", result.Errors ?? [])}",
+            LogTextColor.Yellow);
+        return false;
     }
 
     private static void PatchStimulatorBuffs(

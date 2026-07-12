@@ -13,12 +13,13 @@ public static class TraderGenerator
 {
     private const string RoublesTpl = "5449016a4bdc2d6f028b456f";
 
-    public static void RegisterAll(
+    public static int RegisterAll(
         DatabaseService databaseService,
         IEnumerable<ItemPackDefinition> packs,
         ISptLogger<ItemGenPlugin> logger)
     {
         var traders = databaseService.GetTraders();
+        var added = 0;
 
         foreach (var pack in packs)
         {
@@ -43,7 +44,10 @@ public static class TraderGenerator
 
                     try
                     {
-                        AddToTrader(databaseService, traders, traderDef.TraderId, entry, logger);
+                        if (AddToTrader(databaseService, traders, traderDef.TraderId, entry, logger))
+                        {
+                            added++;
+                        }
                     }
                     catch (Exception ex)
                     {
@@ -54,9 +58,16 @@ public static class TraderGenerator
                 }
             }
         }
+
+        if (added > 0)
+        {
+            logger.LogWithColor($"[ItemGen] Added {added} trader entry/entries across all packs.", LogTextColor.Green);
+        }
+
+        return added;
     }
 
-    private static void AddToTrader(
+    private static bool AddToTrader(
         DatabaseService databaseService,
         dynamic traders,
         string traderId,
@@ -70,7 +81,7 @@ public static class TraderGenerator
             logger.LogWithColor(
                 $"[ItemGen] Trader '{traderId}' not found. Skipping entry for item '{entry.ItemId}'.",
                 LogTextColor.Yellow);
-            return;
+            return false;
         }
 
         var trader = traders[traderIdValue];
@@ -81,7 +92,7 @@ public static class TraderGenerator
             logger.LogWithColor(
                 $"[ItemGen] Trader '{traderId}' has no assort. Skipping entry for item '{entry.ItemId}'.",
                 LogTextColor.Yellow);
-            return;
+            return false;
         }
 
         var itemTemplateId = new MongoId(entry.ItemId);
@@ -91,7 +102,7 @@ public static class TraderGenerator
             logger.LogWithColor(
                 $"[ItemGen] Cannot add item '{entry.ItemId}' to trader '{traderId}' - item not registered.",
                 LogTextColor.Yellow);
-            return;
+            return false;
         }
 
         var stockCount = entry.UnlimitedStock ? 999999 : entry.StockCount;
@@ -127,8 +138,6 @@ public static class TraderGenerator
         assort.BarterScheme[itemTemplateId] = barterEntry;
         assort.LoyalLevelItems[itemTemplateId] = entry.LoyaltyLevel;
 
-        logger.LogWithColor(
-            $"[ItemGen] Added item '{entry.ItemId}' to trader '{traderId}' at LL{entry.LoyaltyLevel} for {entry.PriceRoubles}₽",
-            LogTextColor.Green);
+        return true;
     }
 }

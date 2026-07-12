@@ -17,26 +17,32 @@ public static class KeyGenerator
 {
     private const string KeyMechanicalParentId = "5c99f98d86f7745c314214b3";
 
-    public static void RegisterAll(
+    public static int RegisterAll(
         CustomItemService customItemService,
         DatabaseService databaseService,
         IReadOnlyList<KeyDefinition> definitions,
         ISptLogger<ItemGenPlugin> logger)
     {
+        var registered = 0;
         foreach (var def in definitions)
         {
             try
             {
-                RegisterKey(def, customItemService, databaseService, logger);
+                if (RegisterKey(def, customItemService, databaseService, logger))
+                {
+                    registered++;
+                }
             }
             catch (Exception ex)
             {
                 logger.LogWithColor($"[ItemGen] Failed to register key '{def.Name}': {ex.Message}", LogTextColor.Red);
             }
         }
+
+        return registered;
     }
 
-    private static void RegisterKey(
+    private static bool RegisterKey(
         KeyDefinition def,
         CustomItemService customItemService,
         DatabaseService databaseService,
@@ -99,8 +105,6 @@ public static class KeyGenerator
 
         if (result.Success == true)
         {
-            logger.LogWithColor($"[ItemGen] Registered key: {def.Name} ({def.Id})", LogTextColor.Green);
-
             var items = databaseService.GetItems();
             if (items.TryGetValue(def.Id, out var tpl) && tpl.Properties != null)
             {
@@ -120,13 +124,14 @@ public static class KeyGenerator
                     $"[ItemGen] Could not inject bundle path for key '{def.Name}' - item not found after clone.",
                     LogTextColor.Yellow);
             }
+
+            return true;
         }
-        else
-        {
-            logger.LogWithColor(
-                $"[ItemGen] CreateItemFromClone reported failure for key '{def.Name}': {string.Join(", ", result.Errors ?? [])}",
-                LogTextColor.Yellow);
-        }
+
+        logger.LogWithColor(
+            $"[ItemGen] CreateItemFromClone reported failure for key '{def.Name}': {string.Join(", ", result.Errors ?? [])}",
+            LogTextColor.Yellow);
+        return false;
     }
 
     private static string? GetPropertyPath(JsonElement properties, string propertyName)
