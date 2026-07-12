@@ -62,9 +62,10 @@ import { CONTAINER_TEMPLATES } from './generated_container_templates'
 import { STIM_TEMPLATES } from './generated_stim_templates'
 import { MEDKIT_TEMPLATES } from './generated_medkit_templates'
 import apiItemNames from '../api_item_names.json'
+import { VanillaBundlesPanel } from './VanillaBundlesPanel'
 
 type Tab = 'quest' | 'key' | 'container' | 'stim' | 'medkit'
-type Mode = 'items' | 'traders' | 'bundles'
+type Mode = 'items' | 'traders' | 'bundles' | 'vanilla-bundles'
 type RightPanel = 'editor' | 'json'
 
 const RARITY_PVE = ['Not_exist', 'Common', 'Rare', 'Superrare', 'Legendary']
@@ -809,6 +810,12 @@ export default function App() {
         >
           Bundles {pack.bundles && pack.bundles.length > 0 && `(${pack.bundles.length})`}
         </button>
+        <button
+          className={`px-4 py-1.5 rounded-lg text-sm font-medium transition-colors ${mode === 'vanilla-bundles' ? 'bg-tarkov-accent text-tarkov-bg' : 'text-tarkov-text hover:bg-tarkov-border/50'}`}
+          onClick={() => setMode('vanilla-bundles')}
+        >
+          Vanilla Bundles
+        </button>
       </div>
 
       <div className="flex-1 flex overflow-hidden">
@@ -1111,6 +1118,8 @@ export default function App() {
               traderIndex={selectedTraderIndex}
               onChange={next => setPack({ ...pack, traders: next })}
             />
+          ) : mode === 'vanilla-bundles' ? (
+            <VanillaBundlesPanel />
           ) : (
             <div className="space-y-4 max-w-5xl">
               <Section title="Custom Bundles" icon={<Upload size={18} />}>

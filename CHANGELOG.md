@@ -1,5 +1,8 @@
 # Changelog
 
+## v1.2.1
+- **Client-side icon scaling** — custom items now render their inventory icon at the size defined by `Width`/`Height`, preventing oversized icons from overlapping adjacent slots.
+
 ## v1.2.0
 - **Custom keys now work on vanilla doors** — assign custom keys to vanilla doors, including multiple keys per door via door-key mappings.
 - **New MedKit category** — create custom medkits by cloning Salewa, IFAK, and AFAK templates. Control HP resource, healing cost, damage/health effects, and custom models.
