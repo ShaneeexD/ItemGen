@@ -12,6 +12,7 @@ import {
   Fingerprint,
   HelpCircle,
   Key,
+  Map,
   Menu,
   Package,
   Plus,
@@ -25,6 +26,7 @@ import {
   Syringe,
   Trash2,
   Upload,
+  Wrench,
   X,
 } from 'lucide-react'
 import {
@@ -35,6 +37,7 @@ import {
   ContainerDefinition,
   StimBuff,
   StimDefinition,
+  MedKitDefinition,
   EffectsHealthProperties,
   EffectsDamageProperties,
   TraderDefinition,
@@ -46,6 +49,7 @@ import {
   createDefaultContainer,
   createDefaultStim,
   createDefaultStimBuff,
+  createDefaultMedkit,
   createDefaultTraderEntry,
   generateMongoId,
   getParentName,
@@ -56,9 +60,10 @@ import { QUEST_TEMPLATES } from './generated_quest_templates'
 import { KEY_TEMPLATES } from './generated_key_templates'
 import { CONTAINER_TEMPLATES } from './generated_container_templates'
 import { STIM_TEMPLATES } from './generated_stim_templates'
+import { MEDKIT_TEMPLATES } from './generated_medkit_templates'
 import apiItemNames from '../api_item_names.json'
 
-type Tab = 'quest' | 'key' | 'container' | 'stim'
+type Tab = 'quest' | 'key' | 'container' | 'stim' | 'medkit'
 type Mode = 'items' | 'traders' | 'bundles'
 type RightPanel = 'editor' | 'json'
 
@@ -147,7 +152,7 @@ function validatePack(pack: ItemPackDefinition): ValidationError[] {
   const errors: ValidationError[] = []
   if (!pack.name.trim()) errors.push({ field: 'name', message: 'Pack name is required.' })
 
-  if (pack.questItems.length === 0 && pack.keys.length === 0 && pack.containers.length === 0 && pack.stims.length === 0) {
+  if (pack.questItems.length === 0 && pack.keys.length === 0 && pack.containers.length === 0 && pack.stims.length === 0 && pack.medkits.length === 0) {
     errors.push({ field: 'items', message: 'At least one item entry is required.' })
   }
 
@@ -157,6 +162,7 @@ function validatePack(pack: ItemPackDefinition): ValidationError[] {
     ...pack.keys.map(k => k.id),
     ...pack.containers.map(c => c.id),
     ...pack.stims.map(s => s.id),
+    ...pack.medkits.map(m => m.id),
   ])
 
   pack.questItems.forEach((item, i) => {
@@ -216,6 +222,22 @@ function validatePack(pack: ItemPackDefinition): ValidationError[] {
     if (stim.stackMaxSize < 1) errors.push({ field: `${prefix}.stackMaxSize`, message: 'Stack max size must be at least 1.' })
     if (stim.width < 1) errors.push({ field: `${prefix}.width`, message: 'Width must be at least 1.' })
     if (stim.height < 1) errors.push({ field: `${prefix}.height`, message: 'Height must be at least 1.' })
+  })
+
+  pack.medkits.forEach((medkit, i) => {
+    const prefix = `medkits[${i}]`
+    if (!HEX24.test(medkit.id)) errors.push({ field: `${prefix}.id`, message: 'MedKit ID must be 24 hex characters.' })
+    if (seenIds.has(medkit.id.toLowerCase())) errors.push({ field: `${prefix}.id`, message: 'Duplicate ID.' })
+    else seenIds.add(medkit.id.toLowerCase())
+    if (!HEX24.test(medkit.baseTpl)) errors.push({ field: `${prefix}.baseTpl`, message: 'Base template must be 24 hex characters.' })
+    if (!medkit.name.trim()) errors.push({ field: `${prefix}.name`, message: 'Name is required.' })
+    if (!medkit.shortName.trim()) errors.push({ field: `${prefix}.shortName`, message: 'Short name is required.' })
+    if (!medkit.description.trim()) errors.push({ field: `${prefix}.description`, message: 'Description is required.' })
+    if (medkit.weight < 0) errors.push({ field: `${prefix}.weight`, message: 'Weight cannot be negative.' })
+    if (medkit.medUseTime < 0) errors.push({ field: `${prefix}.medUseTime`, message: 'Use time cannot be negative.' })
+    if (medkit.stackMaxSize < 1) errors.push({ field: `${prefix}.stackMaxSize`, message: 'Stack max size must be at least 1.' })
+    if (medkit.width < 1) errors.push({ field: `${prefix}.width`, message: 'Width must be at least 1.' })
+    if (medkit.height < 1) errors.push({ field: `${prefix}.height`, message: 'Height must be at least 1.' })
   })
 
   pack.traders.forEach((trader, ti) => {
@@ -329,6 +351,8 @@ function Sidebar({ open, onClose }: { open: boolean; onClose: () => void }) {
     { name: 'AmmoGen Tool', url: 'https://ammogen-tool.netlify.app', icon: <Target size={18} />, active: false },
     { name: 'TraderGen Tool', url: 'https://tradergen-tool.netlify.app', icon: <Store size={18} />, active: false },
     { name: 'ItemGen Tool', url: '#', icon: <Package size={18} />, active: true },
+    { name: 'Map Editor Lite', url: 'https://mapeditorlite-tool.netlify.app', icon: <Map size={18} />, active: false },
+    { name: 'Serenity Workshop', url: 'https://serenity-workshop.netlify.app', icon: <Wrench size={18} />, active: false },
   ]
 
   return (
@@ -389,6 +413,7 @@ export default function App() {
   const [selectedKeyIndex, setSelectedKeyIndex] = useState(0)
   const [selectedContainerIndex, setSelectedContainerIndex] = useState(0)
   const [selectedStimIndex, setSelectedStimIndex] = useState(0)
+  const [selectedMedkitIndex, setSelectedMedkitIndex] = useState(0)
   const [selectedTraderIndex, setSelectedTraderIndex] = useState(0)
   const [rightPanel, setRightPanel] = useState<RightPanel>('editor')
   const [copyFeedback, setCopyFeedback] = useState<string | null>(null)
@@ -401,9 +426,10 @@ export default function App() {
     if (tab === 'quest') return pack.questItems
     if (tab === 'key') return pack.keys
     if (tab === 'stim') return pack.stims
+    if (tab === 'medkit') return pack.medkits
     return pack.containers
   }, [tab, pack])
-  const selectedIndex = tab === 'quest' ? selectedQuestIndex : tab === 'key' ? selectedKeyIndex : tab === 'stim' ? selectedStimIndex : selectedContainerIndex
+  const selectedIndex = tab === 'quest' ? selectedQuestIndex : tab === 'key' ? selectedKeyIndex : tab === 'stim' ? selectedStimIndex : tab === 'medkit' ? selectedMedkitIndex : selectedContainerIndex
   const selectedItem = activeItems[selectedIndex]
   const validationErrors = useMemo(() => validatePack(pack), [pack])
 
@@ -411,7 +437,7 @@ export default function App() {
     setPack(next)
   }, [])
 
-  const updateItem = useCallback((index: number, updates: Partial<QuestItemDefinition> | Partial<KeyDefinition> | Partial<ContainerDefinition> | Partial<StimDefinition>) => {
+  const updateItem = useCallback((index: number, updates: Partial<QuestItemDefinition> | Partial<KeyDefinition> | Partial<ContainerDefinition> | Partial<StimDefinition> | Partial<MedKitDefinition>) => {
     const next = { ...pack }
     let oldId: string | null = null
     let newId: string | null = null
@@ -427,6 +453,10 @@ export default function App() {
       oldId = next.stims[index]?.id ?? null
       next.stims = next.stims.map((item, i) => (i === index ? { ...item, ...updates } as StimDefinition : item))
       newId = next.stims[index]?.id ?? null
+    } else if (tab === 'medkit') {
+      oldId = next.medkits[index]?.id ?? null
+      next.medkits = next.medkits.map((item, i) => (i === index ? { ...item, ...updates } as MedKitDefinition : item))
+      newId = next.medkits[index]?.id ?? null
     } else {
       oldId = next.containers[index]?.id ?? null
       next.containers = next.containers.map((item, i) => (i === index ? { ...item, ...updates } as ContainerDefinition : item))
@@ -452,6 +482,9 @@ export default function App() {
     } else if (tab === 'stim') {
       next.stims = [...next.stims, createDefaultStim()]
       setSelectedStimIndex(next.stims.length - 1)
+    } else if (tab === 'medkit') {
+      next.medkits = [...next.medkits, createDefaultMedkit()]
+      setSelectedMedkitIndex(next.medkits.length - 1)
     } else {
       next.containers = [...next.containers, createDefaultContainer()]
       setSelectedContainerIndex(next.containers.length - 1)
@@ -470,12 +503,15 @@ export default function App() {
     } else if (tab === 'stim') {
       next.stims = next.stims.filter((_, i) => i !== index)
       setSelectedStimIndex(Math.max(0, Math.min(selectedStimIndex, next.stims.length - 1)))
+    } else if (tab === 'medkit') {
+      next.medkits = next.medkits.filter((_, i) => i !== index)
+      setSelectedMedkitIndex(Math.max(0, Math.min(selectedMedkitIndex, next.medkits.length - 1)))
     } else {
       next.containers = next.containers.filter((_, i) => i !== index)
       setSelectedContainerIndex(Math.max(0, Math.min(selectedContainerIndex, next.containers.length - 1)))
     }
     updatePack(next)
-  }, [pack, selectedContainerIndex, selectedKeyIndex, selectedQuestIndex, selectedStimIndex, updatePack])
+  }, [pack, selectedContainerIndex, selectedKeyIndex, selectedMedkitIndex, selectedQuestIndex, selectedStimIndex, updatePack])
 
   const moveItem = useCallback((index: number, dir: -1 | 1) => {
     const next = { ...pack }
@@ -501,6 +537,13 @@ export default function App() {
       list.splice(newIndex, 0, moved)
       next.stims = list
       setSelectedStimIndex(newIndex)
+    } else if (tab === 'medkit') {
+      const list = [...next.medkits]
+      if (newIndex < 0 || newIndex >= list.length) return
+      const [moved] = list.splice(index, 1)
+      list.splice(newIndex, 0, moved)
+      next.medkits = list
+      setSelectedMedkitIndex(newIndex)
     } else {
       const list = [...next.containers]
       if (newIndex < 0 || newIndex >= list.length) return
@@ -557,16 +600,21 @@ export default function App() {
           ...s,
           maxBodyPartsToHeal: s.maxBodyPartsToHeal ?? 0,
         })),
+        medkits: (imported.medkits || []).map(m => ({
+          ...m,
+          maxBodyPartsToHeal: m.maxBodyPartsToHeal ?? 0,
+        })),
         traders: imported.traders?.length
           ? imported.traders
           : VANILLA_TRADERS.map(t => ({ traderId: t.id, enabled: true, entries: [] })),
         bundles: importedBundles.length > 0 ? importedBundles : imported.bundles || [],
       }
       updatePack(normalized)
-      setTab(normalized.questItems.length > 0 ? 'quest' : normalized.keys.length > 0 ? 'key' : normalized.stims.length > 0 ? 'stim' : 'container')
+      setTab(normalized.questItems.length > 0 ? 'quest' : normalized.keys.length > 0 ? 'key' : normalized.stims.length > 0 ? 'stim' : normalized.medkits.length > 0 ? 'medkit' : 'container')
       setSelectedQuestIndex(0)
       setSelectedKeyIndex(0)
       setSelectedContainerIndex(0)
+      setSelectedMedkitIndex(0)
     } catch (e) {
       alert('Invalid pack file: ' + (e as Error).message)
     }
@@ -653,6 +701,31 @@ export default function App() {
         effectsDamage: template?.effectsDamage ?? {},
         properties: cleanProps,
       } as Partial<StimDefinition>)
+    } else if (tab === 'medkit') {
+      const template = MEDKIT_TEMPLATES.find(t => t.id === templateId)
+      const props = template?.properties ?? {}
+      const cleanProps = { ...props, Prefab: { ...props.Prefab, path: '' }, UsePrefab: { ...props.UsePrefab, path: '' }, StimulatorBuffs: '', effects_health: {}, effects_damage: {}, BodyPartPriority: [], foodEffectType: '' }
+      updateItem(selectedIndex, {
+        ...baseUpdates,
+        weight: template?.weight ?? (typeof props.Weight === 'number' ? props.Weight : 0.5),
+        backgroundColor: template?.backgroundColor ?? props.BackgroundColor,
+        rarityPvE: props.RarityPvE ?? 'Rare',
+        canSellOnRagfair: props.CanSellOnRagfair ?? true,
+        itemSound: template?.itemSound ?? props.ItemSound ?? 'med_medkit',
+        stimulatorBuffs: '',
+        medEffectType: template?.medEffectType ?? props.medEffectType ?? 'duringUse',
+        medUseTime: template?.medUseTime ?? (typeof props.medUseTime === 'number' ? props.medUseTime : 3),
+        maxHpResource: template?.maxHpResource ?? (typeof props.MaxHpResource === 'number' ? props.MaxHpResource : 400),
+        hpResourceRate: template?.hpResourceRate ?? (typeof props.hpResourceRate === 'number' ? props.hpResourceRate : 85),
+        maxBodyPartsToHeal: 0,
+        stackMaxSize: template?.stackMaxSize ?? (typeof props.StackMaxSize === 'number' ? props.StackMaxSize : 1),
+        width: template?.width ?? (typeof props.Width === 'number' ? props.Width : 1),
+        height: template?.height ?? (typeof props.Height === 'number' ? props.Height : 2),
+        customBuffs: [],
+        effectsHealth: template?.effectsHealth ?? {},
+        effectsDamage: template?.effectsDamage ?? {},
+        properties: cleanProps,
+      } as Partial<MedKitDefinition>)
     } else {
       const template = CONTAINER_TEMPLATES.find(t => t.id === templateId)
       const props = template?.properties ?? {}
@@ -756,16 +829,17 @@ export default function App() {
                     <option value="key">Keys ({pack.keys.length})</option>
                     <option value="container">Containers ({pack.containers.length})</option>
                     <option value="stim">Stims ({pack.stims.length})</option>
+                    <option value="medkit">MedKits ({pack.medkits.length})</option>
                   </select>
                 </Field>
                 <button className="btn-primary w-full text-sm flex items-center justify-center gap-1.5" onClick={addItem}>
-                  <Plus size={14} /> Add {tab === 'quest' ? 'Quest Item' : tab === 'key' ? 'Key' : tab === 'stim' ? 'Stim' : 'Container'}
+                  <Plus size={14} /> Add {tab === 'quest' ? 'Quest Item' : tab === 'key' ? 'Key' : tab === 'stim' ? 'Stim' : tab === 'medkit' ? 'MedKit' : 'Container'}
                 </button>
               </div>
 
               <div ref={listRef} className="flex-1 overflow-y-auto p-2 space-y-2">
                 {activeItems.map((item, i) => {
-                  const listPrefix = tab === 'quest' ? 'questItems' : tab === 'key' ? 'keys' : tab === 'stim' ? 'stims' : 'containers'
+                  const listPrefix = tab === 'quest' ? 'questItems' : tab === 'key' ? 'keys' : tab === 'stim' ? 'stims' : tab === 'medkit' ? 'medkits' : 'containers'
                   const hasErrors = validationErrors.some(e => e.field.startsWith(`${listPrefix}[${i}]`))
                   return (
                     <div
@@ -779,6 +853,7 @@ export default function App() {
                         if (tab === 'quest') setSelectedQuestIndex(i)
                         else if (tab === 'key') setSelectedKeyIndex(i)
                         else if (tab === 'stim') setSelectedStimIndex(i)
+                        else if (tab === 'medkit') setSelectedMedkitIndex(i)
                         else setSelectedContainerIndex(i)
                       }}
                     >
@@ -792,13 +867,13 @@ export default function App() {
                   )
                 })}
                 {activeItems.length === 0 && (
-                  <div className="text-sm text-tarkov-text-dim text-center py-4">No {tab === 'quest' ? 'quest items' : tab === 'key' ? 'keys' : tab === 'stim' ? 'stims' : 'containers'} yet.</div>
+                  <div className="text-sm text-tarkov-text-dim text-center py-4">No {tab === 'quest' ? 'quest items' : tab === 'key' ? 'keys' : tab === 'stim' ? 'stims' : tab === 'medkit' ? 'medkits' : 'containers'} yet.</div>
                 )}
               </div>
 
               <div className="p-3 border-t border-tarkov-border space-y-2">
                 <button className="btn-primary w-full text-sm flex items-center justify-center gap-1.5" onClick={addItem}>
-                  <Plus size={14} /> Add {tab === 'quest' ? 'Quest Item' : tab === 'key' ? 'Key' : tab === 'stim' ? 'Stim' : 'Container'}
+                  <Plus size={14} /> Add {tab === 'quest' ? 'Quest Item' : tab === 'key' ? 'Key' : tab === 'stim' ? 'Stim' : tab === 'medkit' ? 'MedKit' : 'Container'}
                 </button>
               </div>
             </>
@@ -886,17 +961,17 @@ export default function App() {
 
                 <Section title="Identity" icon={<Fingerprint size={18} />}>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <Field label="Item ID" tooltip="Unique 24-character hex ID for this custom item. Used by quests, traders, and other mods to reference it." error={errorsByField(`${tab === 'quest' ? 'questItems' : tab === 'key' ? 'keys' : 'containers'}[${selectedIndex}].id`).length > 0}>
+                    <Field label="Item ID" tooltip="Unique 24-character hex ID for this custom item. Used by quests, traders, and other mods to reference it." error={errorsByField(`${tab === 'quest' ? 'questItems' : tab === 'key' ? 'keys' : tab === 'medkit' ? 'medkits' : 'containers'}[${selectedIndex}].id`).length > 0}>
                       <div className="flex gap-2">
                         <input className="input-field flex-1 font-mono text-sm" value={selectedItem.id} onChange={e => updateItem(selectedIndex, { id: e.target.value })} maxLength={24} />
                         <button className="btn-secondary text-xs px-2" onClick={() => updateItem(selectedIndex, { id: generateMongoId() })} title="Regenerate ID">
                           <RefreshCw size={14} />
                         </button>
                       </div>
-                      <FieldErrors errors={errorsByField(`${tab === 'quest' ? 'questItems' : tab === 'key' ? 'keys' : 'containers'}[${selectedIndex}].id`)} />
+                      <FieldErrors errors={errorsByField(`${tab === 'quest' ? 'questItems' : tab === 'key' ? 'keys' : tab === 'medkit' ? 'medkits' : 'containers'}[${selectedIndex}].id`)} />
                     </Field>
 
-                    <Field label="Base Template" tooltip={`Vanilla item to clone. The new item inherits the parent category, handbook category, and model unless overridden. Search all SPT items below; keys, quest items and containers are included.`} error={errorsByField(`${tab === 'quest' ? 'questItems' : tab === 'key' ? 'keys' : 'containers'}[${selectedIndex}].baseTpl`).length > 0}>
+                    <Field label="Base Template" tooltip={`Vanilla item to clone. The new item inherits the parent category, handbook category, and model unless overridden. Search all SPT items below; keys, quest items, containers, stims and medkits are included.`} error={errorsByField(`${tab === 'quest' ? 'questItems' : tab === 'key' ? 'keys' : tab === 'medkit' ? 'medkits' : 'containers'}[${selectedIndex}].baseTpl`).length > 0}>
                       <SearchableSelect
                         value={selectedItem.baseTpl}
                         onChange={id => selectTemplate(id)}
@@ -908,7 +983,7 @@ export default function App() {
                           {selectedItem.baseTpl} {getParentDisplay(selectedItem.baseTpl, tab)}
                         </div>
                       )}
-                      <FieldErrors errors={errorsByField(`${tab === 'quest' ? 'questItems' : tab === 'key' ? 'keys' : 'containers'}[${selectedIndex}].baseTpl`)} />
+                      <FieldErrors errors={errorsByField(`${tab === 'quest' ? 'questItems' : tab === 'key' ? 'keys' : tab === 'medkit' ? 'medkits' : 'containers'}[${selectedIndex}].baseTpl`)} />
                     </Field>
                   </div>
 
@@ -1001,7 +1076,7 @@ export default function App() {
                       <input className="input-field" placeholder="e.g. 123456789012345678901234, 567890123456789012345678" value={(selectedItem as KeyDefinition).doorIds.join(', ')} onChange={e => updateItem(selectedIndex, { doorIds: e.target.value.split(',').map(s => s.trim()) })} />
                     </Field>
                     <div className="mt-3 text-sm text-tarkov-text-dim bg-tarkov-bg border border-tarkov-border rounded p-3">
-                      <span className="text-tarkov-accent font-semibold">Note:</span> Door IDs should be vanilla EFT door IDs. Custom doors added by mods such as Map Editor Lite can have the key ID set in the editor.
+                      <span className="text-tarkov-accent font-semibold">Note:</span> Door IDs should be vanilla EFT door IDs. Custom doors added by mods such as Map Editor Lite can have the key ID set in the editor, and Map Editor Lite can also dump door IDs while in raid.
                     </div>
                   </Section>
                 )}
@@ -1010,6 +1085,7 @@ export default function App() {
                   <StimSpecifics
                     stim={selectedItem as StimDefinition}
                     onChange={updates => updateItem(selectedIndex, updates as Partial<StimDefinition>)}
+                    mode={tab === 'medkit' ? 'medkit' : 'stim'}
                   />
                 )}
 
@@ -1108,6 +1184,10 @@ function getTemplateName(id: string, tab: Tab): string {
     const t = STIM_TEMPLATES.find(x => x.id === id)
     return t ? t.displayName : ''
   }
+  if (tab === 'medkit') {
+    const t = MEDKIT_TEMPLATES.find(x => x.id === id)
+    return t ? t.displayName : ''
+  }
   const t = CONTAINER_TEMPLATES.find(x => x.id === id)
   return t ? t.displayName : ''
 }
@@ -1123,6 +1203,10 @@ function getTemplateParent(id: string, tab: Tab): string {
   }
   if (tab === 'stim') {
     const t = STIM_TEMPLATES.find(x => x.id === id)
+    return t ? t.parent : ''
+  }
+  if (tab === 'medkit') {
+    const t = MEDKIT_TEMPLATES.find(x => x.id === id)
     return t ? t.parent : ''
   }
   const t = CONTAINER_TEMPLATES.find(x => x.id === id)
@@ -1154,7 +1238,7 @@ function TraderEditor({ pack, traderIndex, onChange }: { pack: ItemPackDefinitio
   }
 
   const addEntry = () => {
-    const allItems = [...pack.questItems, ...pack.keys, ...pack.containers, ...pack.stims]
+    const allItems = [...pack.questItems, ...pack.keys, ...pack.containers, ...pack.stims, ...pack.medkits]
     const itemId = allItems[0]?.id || ''
     updateTrader({ entries: [...trader.entries, createDefaultTraderEntry(itemId)] })
   }
@@ -1163,7 +1247,7 @@ function TraderEditor({ pack, traderIndex, onChange }: { pack: ItemPackDefinitio
     updateTrader({ entries: trader.entries.filter((_, i) => i !== index) })
   }
 
-  const allItems = [...pack.questItems, ...pack.keys, ...pack.containers, ...pack.stims]
+  const allItems = [...pack.questItems, ...pack.keys, ...pack.containers, ...pack.stims, ...pack.medkits]
   const itemOptions = allItems.map(item => ({
     value: item.id,
     label: `${item.name} (${item.shortName})`,
@@ -1411,9 +1495,10 @@ function EffectSelector({ options, onSelect, label }: EffectSelectorProps) {
 interface StimSpecificsProps {
   stim: StimDefinition
   onChange: (updates: Partial<StimDefinition>) => void
+  mode?: 'stim' | 'medkit'
 }
 
-function StimSpecifics({ stim, onChange }: StimSpecificsProps) {
+function StimSpecifics({ stim, onChange, mode = 'stim' }: StimSpecificsProps) {
   const props = stim.properties || {}
 
   const updateProp = (key: string, value: any) => {
@@ -1473,17 +1558,19 @@ function StimSpecifics({ stim, onChange }: StimSpecificsProps) {
     }
   }
 
+  const isMedKit = mode === 'medkit'
+
   return (
-    <Section title="Stim Specifics" icon={<Syringe size={18} />}>
+    <Section title={isMedKit ? 'MedKit Specifics' : 'Stim Specifics'} icon={isMedKit ? <Package size={18} /> : <Syringe size={18} />}>
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <Field label="Stimulator Buffs" tooltip="Existing buff set to use as a base, or leave as (Nothing) to only use the custom buffs below. If custom buffs are defined, the server will patch globals and reference that set here.">
+        {!isMedKit && <Field label="Stimulator Buffs" tooltip="Existing buff set to use as a base, or leave as (Nothing) to only use the custom buffs below. If custom buffs are defined, the server will patch globals and reference that set here.">
           <select className="input-field" value={isCustomBuff ? 'Custom' : stim.stimulatorBuffs} onChange={e => setStimulatorBuffs(e.target.value === 'Custom' ? '' : e.target.value)}>
             <option value="">(Nothing)</option>
             {KNOWN_STIM_BUFFS.map(b => <option key={b} value={b}>{b}</option>)}
             <option value="Custom">Custom</option>
           </select>
           {isCustomBuff && <input className="input-field mt-2" value={stim.stimulatorBuffs} onChange={e => setStimulatorBuffs(e.target.value)} placeholder="Custom buff set name..." />}
-        </Field>
+        </Field>}
         <Field label="Med Effect Type" tooltip="When the stim effect applies.">
           <select className="input-field" value={stim.medEffectType} onChange={e => onChange({ medEffectType: e.target.value })}>
             {MED_EFFECT_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
@@ -1495,19 +1582,19 @@ function StimSpecifics({ stim, onChange }: StimSpecificsProps) {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mt-4">
-        <Field label="Max HP Resource" tooltip="HP resource pool for medical items. Usually 0 for stims.">
+        <Field label="Max HP Resource" tooltip={isMedKit ? 'HP resource pool for this medkit.' : 'HP resource pool for medical items. Usually 0 for stims.'}>
           <input className="input-field" type="number" min={0} value={stim.maxHpResource} onChange={e => onChange({ maxHpResource: parseInt(e.target.value) || 0 })} />
         </Field>
-        <Field label="HP Resource Rate" tooltip="HP regeneration rate. Usually 0 for stims.">
+        <Field label="HP Resource Rate" tooltip={isMedKit ? 'HP restoration rate per use.' : 'HP regeneration rate. Usually 0 for stims.'}>
           <input className="input-field" type="number" min={0} value={stim.hpResourceRate} onChange={e => onChange({ hpResourceRate: parseInt(e.target.value) || 0 })} />
         </Field>
-        <Field label="Max Body Parts" tooltip="Maximum number of body parts this stim can heal in one use (0 = unlimited). Randomly picks if more are damaged.">
+        {!isMedKit && <Field label="Max Body Parts" tooltip="Maximum number of body parts this stim can heal in one use (0 = unlimited). Randomly picks if more are damaged.">
           <input className="input-field" type="number" min={0} value={stim.maxBodyPartsToHeal} onChange={e => onChange({ maxBodyPartsToHeal: parseInt(e.target.value) || 0 })} />
-        </Field>
+        </Field>}
         <Field label="Stack Max Size" tooltip="Maximum number of this item that can stack in one cell.">
           <input className="input-field" type="number" min={1} value={stim.stackMaxSize} onChange={e => onChange({ stackMaxSize: parseInt(e.target.value) || 1 })} />
         </Field>
-        <Field label="Item Sound" tooltip="Sound identifier used when moving the stim.">
+        <Field label="Item Sound" tooltip="Sound identifier used when moving the item.">
           <input className="input-field" value={stim.itemSound} onChange={e => onChange({ itemSound: e.target.value })} />
         </Field>
       </div>
@@ -1522,15 +1609,15 @@ function StimSpecifics({ stim, onChange }: StimSpecificsProps) {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
-        <Field label="Custom Model" tooltip="Custom bundle filename for the loot/inventory model (e.g. my_stim.bundle). The client plugin matches this to a file in BepInEx\plugins\Serenity-ItemGen\bundles. Leave empty to inherit from the base template.">
-          <input className="input-field" value={props.Prefab?.path ?? ''} onChange={e => updateProp('Prefab', { ...props.Prefab, path: e.target.value })} placeholder="my_stim.bundle" />
+        <Field label="Custom Model" tooltip="Custom bundle filename for the loot/inventory model (e.g. my_medkit.bundle). The client plugin matches this to a file in BepInEx\plugins\Serenity-ItemGen\bundles. Leave empty to inherit from the base template.">
+          <input className="input-field" value={props.Prefab?.path ?? ''} onChange={e => updateProp('Prefab', { ...props.Prefab, path: e.target.value })} placeholder="my_medkit.bundle" />
         </Field>
-        <Field label="Use Model" tooltip="Custom bundle filename for the in-hand/use animation model. Usually the same as Custom Model unless you have a separate injector animation. Leave empty to inherit from the base template.">
-          <input className="input-field" value={props.UsePrefab?.path ?? ''} onChange={e => updateProp('UsePrefab', { ...props.UsePrefab, path: e.target.value })} placeholder="my_stim.bundle" />
+        <Field label="Use Model" tooltip="Custom bundle filename for the in-hand/use animation model. Leave empty to inherit from the base template.">
+          <input className="input-field" value={props.UsePrefab?.path ?? ''} onChange={e => updateProp('UsePrefab', { ...props.UsePrefab, path: e.target.value })} placeholder="my_medkit.bundle" />
         </Field>
       </div>
 
-      <div className="mt-6">
+      {!isMedKit && <div className="mt-6">
         <div className="flex items-center justify-between mb-3">
           <h3 className="text-sm font-semibold text-tarkov-text">Custom Buffs</h3>
           <button className="btn-secondary text-xs flex items-center gap-1" onClick={addBuff}>
@@ -1591,7 +1678,7 @@ function StimSpecifics({ stim, onChange }: StimSpecificsProps) {
             </div>
           </div>
         ))}
-      </div>
+      </div>}
 
       <div className="mt-6">
         <div className="flex items-center justify-between mb-3">
@@ -1616,13 +1703,13 @@ function StimSpecifics({ stim, onChange }: StimSpecificsProps) {
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
               <Field label="Value" tooltip="Magnitude of the health effect.">
-                <input className="input-field" type="number" value={effect.value ?? ''} onChange={e => updateHealthEffect(key, { value: e.target.value === '' ? undefined : parseFloat(e.target.value) })} />
+                <input className="input-field" type="number" step="0.01" value={effect.value ?? ''} onChange={e => updateHealthEffect(key, { value: e.target.value === '' ? undefined : parseFloat(e.target.value) })} />
               </Field>
               <Field label="Delay (s)" tooltip="Seconds before the effect starts.">
-                <input className="input-field" type="number" min={0} value={effect.delay ?? ''} onChange={e => updateHealthEffect(key, { delay: e.target.value === '' ? undefined : parseFloat(e.target.value) })} />
+                <input className="input-field" type="number" min={0} step="0.01" value={effect.delay ?? ''} onChange={e => updateHealthEffect(key, { delay: e.target.value === '' ? undefined : parseFloat(e.target.value) })} />
               </Field>
               <Field label="Duration (s)" tooltip="How long the effect lasts.">
-                <input className="input-field" type="number" min={0} value={effect.duration ?? ''} onChange={e => updateHealthEffect(key, { duration: e.target.value === '' ? undefined : parseFloat(e.target.value) })} />
+                <input className="input-field" type="number" min={0} step="0.01" value={effect.duration ?? ''} onChange={e => updateHealthEffect(key, { duration: e.target.value === '' ? undefined : parseFloat(e.target.value) })} />
               </Field>
             </div>
           </div>
@@ -1651,29 +1738,26 @@ function StimSpecifics({ stim, onChange }: StimSpecificsProps) {
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
-              <Field label="Value" tooltip="Magnitude of the damage effect.">
-                <input className="input-field" type="number" value={effect.value ?? ''} onChange={e => updateDamageEffect(key, { value: e.target.value === '' ? undefined : parseFloat(e.target.value) })} />
+              <Field label="Cost" tooltip="HP resource cost to remove the effect. For medkits this is the amount of HP resource consumed to cure the effect.">
+                <input className="input-field" type="number" min={0} step="0.01" value={effect.cost ?? ''} onChange={e => updateDamageEffect(key, { cost: e.target.value === '' ? undefined : parseFloat(e.target.value) })} />
               </Field>
               <Field label="Delay (s)" tooltip="Seconds before the effect starts.">
-                <input className="input-field" type="number" min={0} value={effect.delay ?? ''} onChange={e => updateDamageEffect(key, { delay: e.target.value === '' ? undefined : parseFloat(e.target.value) })} />
+                <input className="input-field" type="number" min={0} step="0.01" value={effect.delay ?? ''} onChange={e => updateDamageEffect(key, { delay: e.target.value === '' ? undefined : parseFloat(e.target.value) })} />
               </Field>
               <Field label="Duration (s)" tooltip="How long the effect lasts.">
-                <input className="input-field" type="number" min={0} value={effect.duration ?? ''} onChange={e => updateDamageEffect(key, { duration: e.target.value === '' ? undefined : parseFloat(e.target.value) })} />
+                <input className="input-field" type="number" min={0} step="0.01" value={effect.duration ?? ''} onChange={e => updateDamageEffect(key, { duration: e.target.value === '' ? undefined : parseFloat(e.target.value) })} />
               </Field>
               <Field label="Fade Out (s)" tooltip="Fade out duration of the effect.">
-                <input className="input-field" type="number" min={0} value={effect.fadeOut ?? ''} onChange={e => updateDamageEffect(key, { fadeOut: e.target.value === '' ? undefined : parseFloat(e.target.value) })} />
+                <input className="input-field" type="number" min={0} step="0.01" value={effect.fadeOut ?? ''} onChange={e => updateDamageEffect(key, { fadeOut: e.target.value === '' ? undefined : parseFloat(e.target.value) })} />
               </Field>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mt-3">
-              <Field label="Cost" tooltip="HP resource cost to remove the effect.">
-                <input className="input-field" type="number" min={0} value={effect.cost ?? ''} onChange={e => updateDamageEffect(key, { cost: e.target.value === '' ? undefined : parseFloat(e.target.value) })} />
-              </Field>
               <Field label="Health Penalty Min" tooltip="Minimum health penalty.">
-                <input className="input-field" type="number" value={effect.healthPenaltyMin ?? ''} onChange={e => updateDamageEffect(key, { healthPenaltyMin: e.target.value === '' ? undefined : parseFloat(e.target.value) })} />
+                <input className="input-field" type="number" step="0.01" value={effect.healthPenaltyMin ?? ''} onChange={e => updateDamageEffect(key, { healthPenaltyMin: e.target.value === '' ? undefined : parseFloat(e.target.value) })} />
               </Field>
               <Field label="Health Penalty Max" tooltip="Maximum health penalty.">
-                <input className="input-field" type="number" value={effect.healthPenaltyMax ?? ''} onChange={e => updateDamageEffect(key, { healthPenaltyMax: e.target.value === '' ? undefined : parseFloat(e.target.value) })} />
+                <input className="input-field" type="number" step="0.01" value={effect.healthPenaltyMax ?? ''} onChange={e => updateDamageEffect(key, { healthPenaltyMax: e.target.value === '' ? undefined : parseFloat(e.target.value) })} />
               </Field>
             </div>
           </div>

@@ -19,7 +19,7 @@ public record ModMetadata : AbstractModMetadata
     public override string Name { get; init; } = "ItemGen";
     public override string Author { get; init; } = "Serenity";
     public override List<string>? Contributors { get; init; }
-    public override SemanticVersioning.Version Version { get; init; } = new("1.1.0");
+    public override SemanticVersioning.Version Version { get; init; } = new("1.2.0");
     public override SemanticVersioning.Range SptVersion { get; init; } = new("4.0.13");
     public override List<string>? Incompatibilities { get; init; }
     public override Dictionary<string, SemanticVersioning.Range>? ModDependencies { get; init; }
@@ -74,11 +74,14 @@ public class ItemGenPlugin(
             var enabledContainers = containerDefinitions.Where(d => d.Enabled).ToList();
             var stimDefinitions = packs.SelectMany(p => p.Definition.Stims).ToList();
             var enabledStims = stimDefinitions.Where(d => d.Enabled).ToList();
+            var medkitDefinitions = packs.SelectMany(p => p.Definition.Medkits).ToList();
+            var enabledMedkits = medkitDefinitions.Where(d => d.Enabled).ToList();
 
             logger.LogWithColor($"[ItemGen] Loaded {questDefinitions.Count} quest item definition(s), {enabledQuestItems.Count} enabled.", LogTextColor.Cyan);
             logger.LogWithColor($"[ItemGen] Loaded {keyDefinitions.Count} key definition(s), {enabledKeys.Count} enabled.", LogTextColor.Cyan);
             logger.LogWithColor($"[ItemGen] Loaded {containerDefinitions.Count} container definition(s), {enabledContainers.Count} enabled.", LogTextColor.Cyan);
             logger.LogWithColor($"[ItemGen] Loaded {stimDefinitions.Count} stim definition(s), {enabledStims.Count} enabled.", LogTextColor.Cyan);
+            logger.LogWithColor($"[ItemGen] Loaded {medkitDefinitions.Count} medkit definition(s), {enabledMedkits.Count} enabled.", LogTextColor.Cyan);
 
             // Register custom quest inventory items
             QuestInventoryItemGenerator.RegisterAll(customItemService, databaseService, enabledQuestItems, logger);
@@ -95,11 +98,14 @@ public class ItemGenPlugin(
             // Register custom stims
             StimGenerator.RegisterAll(customItemService, databaseService, enabledStims, logger);
 
+            // Register custom medkits
+            MedKitGenerator.RegisterAll(customItemService, databaseService, enabledMedkits, logger);
+
             // Add custom items to trader assorts
             TraderGenerator.RegisterAll(databaseService, packs.Select(p => p.Definition), logger);
 
             logger.LogWithColor("[ItemGen] ====================================", LogTextColor.Cyan);
-            logger.LogWithColor($"[ItemGen] Done! Registered {enabledQuestItems.Count} custom quest item(s), {enabledKeys.Count} custom key(s), {enabledContainers.Count} custom container(s) and {enabledStims.Count} custom stim(s).", LogTextColor.Green);
+            logger.LogWithColor($"[ItemGen] Done! Registered {enabledQuestItems.Count} custom quest item(s), {enabledKeys.Count} custom key(s), {enabledContainers.Count} custom container(s), {enabledStims.Count} custom stim(s) and {enabledMedkits.Count} custom medkit(s).", LogTextColor.Green);
             logger.LogWithColor("[ItemGen] ====================================", LogTextColor.Cyan);
         }
         catch (Exception ex)

@@ -235,7 +235,7 @@ Invalid packs are **skipped** — other packs still load normally.
 
 The ItemGen Tool export ZIP is already structured for distribution. When publishing:
 
-1. **State the dependency**: Your pack requires **ItemGen v1.1.0** for SPT 4.0.13.
+1. **State the dependency**: Your pack requires **ItemGen v1.2.0** for SPT 4.0.13.
 2. **Publish as an addon**, not a standalone mod. Your ZIP should only contain your pack JSON and any custom bundles.
 3. **Do not include** the ItemGen DLL or other authors' packs in your ZIP.
 4. **Test** by extracting and running the server before publishing.

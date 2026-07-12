@@ -18,8 +18,9 @@ public static class ItemValidator
         var keyList = pack.Keys ?? [];
         var containerList = pack.Containers ?? [];
         var stimList = pack.Stims ?? [];
+        var medkitList = pack.Medkits ?? [];
 
-        if (questList.Count == 0 && keyList.Count == 0 && containerList.Count == 0 && stimList.Count == 0)
+        if (questList.Count == 0 && keyList.Count == 0 && containerList.Count == 0 && stimList.Count == 0 && medkitList.Count == 0)
         {
             errors.Add($"Pack '{fileName}': at least one item entry is required.");
             return errors;
@@ -121,6 +122,28 @@ public static class ItemValidator
                 errors.Add($"{prefix}: 'width' must be at least 1.");
 
             if (stim.Height < 1)
+                errors.Add($"{prefix}: 'height' must be at least 1.");
+        }
+
+        for (var i = 0; i < medkitList.Count; i++)
+        {
+            var medkit = medkitList[i];
+            var prefix = $"MedKit[{i}]";
+            ValidateItem(medkit, prefix, errors, seenIds);
+
+            if (medkit.Weight < 0)
+                errors.Add($"{prefix}: 'weight' cannot be negative.");
+
+            if (medkit.MedUseTime < 0)
+                errors.Add($"{prefix}: 'medUseTime' cannot be negative.");
+
+            if (medkit.StackMaxSize < 1)
+                errors.Add($"{prefix}: 'stackMaxSize' must be at least 1.");
+
+            if (medkit.Width < 1)
+                errors.Add($"{prefix}: 'width' must be at least 1.");
+
+            if (medkit.Height < 1)
                 errors.Add($"{prefix}: 'height' must be at least 1.");
         }
 

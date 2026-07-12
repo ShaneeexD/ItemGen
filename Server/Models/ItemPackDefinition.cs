@@ -25,6 +25,9 @@ public class ItemPackDefinition
     [JsonPropertyName("stims")]
     public List<StimDefinition> Stims { get; set; } = [];
 
+    [JsonPropertyName("medkits")]
+    public List<MedKitDefinition> Medkits { get; set; } = [];
+
     [JsonPropertyName("traders")]
     public List<TraderDefinition> Traders { get; set; } = [];
 }
@@ -96,6 +99,42 @@ public class StimDefinition : ItemDefinition
 
     [JsonPropertyName("customBuffs")]
     public List<StimBuff> CustomBuffs { get; set; } = [];
+
+    [JsonPropertyName("effectsHealth")]
+    public Dictionary<string, EffectsHealthProperties>? EffectsHealth { get; set; }
+
+    [JsonPropertyName("effectsDamage")]
+    public Dictionary<string, EffectsDamageProperties>? EffectsDamage { get; set; }
+
+    [JsonPropertyName("properties")]
+    public JsonElement Properties { get; set; }
+}
+
+public class MedKitDefinition : ItemDefinition
+{
+    [JsonPropertyName("itemSound")]
+    public string ItemSound { get; set; } = "med_medkit";
+
+    [JsonPropertyName("medEffectType")]
+    public string MedEffectType { get; set; } = "duringUse";
+
+    [JsonPropertyName("medUseTime")]
+    public float MedUseTime { get; set; } = 3;
+
+    [JsonPropertyName("maxHpResource")]
+    public int MaxHpResource { get; set; } = 400;
+
+    [JsonPropertyName("hpResourceRate")]
+    public int HpResourceRate { get; set; } = 85;
+
+    [JsonPropertyName("stackMaxSize")]
+    public int StackMaxSize { get; set; } = 1;
+
+    [JsonPropertyName("width")]
+    public int Width { get; set; } = 1;
+
+    [JsonPropertyName("height")]
+    public int Height { get; set; } = 2;
 
     [JsonPropertyName("effectsHealth")]
     public Dictionary<string, EffectsHealthProperties>? EffectsHealth { get; set; }
