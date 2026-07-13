@@ -1,5 +1,9 @@
 # Changelog
 
+## v1.3.5
+- **Fixed client icon scaling** - fixed a bug where the item icon scaling would affect other items in the stash.
+
+
 ## v1.2.5
 - **Custom secure containers** - a new feature integrated into the existing container section: create a custom container and toggle `isSecured` so it behaves like a secure container in-game.
 - **Raw JSON properties editor** - new for all existing item types. Add any extra field in the `Raw Properties JSON` panel; the game will register those fields even though they are not in the UI.

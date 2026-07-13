@@ -20,11 +20,22 @@ namespace ItemGen.Client
     internal static class BundleInjector
     {
         private static readonly Dictionary<string, string> _bundleFileByAssetPath = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        private static readonly HashSet<string> _customItemIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        private static readonly HashSet<string> _itemListKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            "questItems", "keys", "containers", "stims", "medkits"
+        };
         private static ManualLogSource _log;
 
         internal static void Init(ManualLogSource log)
         {
             _log = log;
+            LoadCustomItemIds();
+        }
+
+        internal static bool IsCustomItem(string templateId)
+        {
+            return !string.IsNullOrWhiteSpace(templateId) && _customItemIds.Contains(templateId);
         }
 
         internal static void InjectAll()
@@ -120,6 +131,72 @@ namespace ItemGen.Client
                 // Fall back to auto-load by filename
                 _bundleFileByAssetPath[fileName] = filePath;
                 _log?.LogInfo($"Auto-loaded bundle: {fileName} -> {fileName}");
+            }
+        }
+
+        private static void LoadCustomItemIds()
+        {
+            _customItemIds.Clear();
+
+            string[] packDirs = FindItemPackDirectories();
+            foreach (string dir in packDirs)
+            {
+                if (!Directory.Exists(dir))
+                    continue;
+
+                foreach (string file in Directory.GetFiles(dir, "*.json"))
+                {
+                    try
+                    {
+                        string json = File.ReadAllText(file);
+                        if (JObject.Parse(json) is JObject pack)
+                        {
+                            CollectCustomItemIds(pack, _customItemIds);
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        _log?.LogWarning($"Could not read custom item IDs from {file}: {ex.Message}");
+                    }
+                }
+            }
+        }
+
+        private static void CollectCustomItemIds(JObject pack, HashSet<string> ids)
+        {
+            foreach (var prop in pack.Properties())
+            {
+                if (!_itemListKeys.Contains(prop.Name))
+                {
+                    continue;
+                }
+
+                if (prop.Value is not JArray arr)
+                {
+                    continue;
+                }
+
+                foreach (var element in arr)
+                {
+                    if (element is not JObject obj)
+                    {
+                        continue;
+                    }
+
+                    var idToken = obj["id"] ?? obj["Id"];
+                    if (idToken?.Type != JTokenType.String)
+                    {
+                        continue;
+                    }
+
+                    var enabledToken = obj["enabled"] ?? obj["Enabled"];
+                    if (enabledToken != null && enabledToken.Type == JTokenType.Boolean && !enabledToken.Value<bool>())
+                    {
+                        continue;
+                    }
+
+                    ids.Add(idToken.Value<string>());
+                }
             }
         }
 

@@ -12,6 +12,12 @@ namespace ItemGen.Client
         {
             try
             {
+                var item = __instance.Item;
+                if (item == null || !BundleInjector.IsCustomItem(item.StringTemplateId))
+                {
+                    return;
+                }
+
                 var mainImage = Traverse.Create(__instance).Field("MainImage").GetValue<Component>();
                 if (mainImage == null || !mainImage.gameObject.activeInHierarchy)
                 {
