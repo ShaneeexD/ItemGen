@@ -9,7 +9,7 @@ using UnityEngine;
 
 namespace ItemGen.Client
 {
-    [BepInPlugin("com.serenity.itemgen", "ItemGen Client", "1.2.5")]
+    [BepInPlugin("com.serenity.itemgen", "ItemGen Client", "1.3.5")]
     public class Plugin : BaseUnityPlugin
     {
         public static ManualLogSource Log { get; private set; }

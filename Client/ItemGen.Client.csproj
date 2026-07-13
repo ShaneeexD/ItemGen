@@ -4,7 +4,7 @@
     <RootNamespace>ItemGen.Client</RootNamespace>
     <LangVersion>latest</LangVersion>
     <OutputType>Library</OutputType>
-    <Version>1.2.5</Version>
+    <Version>1.3.5</Version>
     <OutputPath>bin\$(Configuration)\</OutputPath>
     <AssemblyName>ItemGen.Client</AssemblyName>
     <SPTPath>C:\SPT</SPTPath>
