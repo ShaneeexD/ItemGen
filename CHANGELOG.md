@@ -1,5 +1,10 @@
 # Changelog
 
+## v1.2.5
+- **Custom secure containers** - a new feature integrated into the existing container section: create a custom container and toggle `isSecured` so it behaves like a secure container in-game.
+- **Raw JSON properties editor** - new for all existing item types. Add any extra field in the `Raw Properties JSON` panel; the game will register those fields even though they are not in the UI.
+- **Reduced server logging** - item generators no longer log per-item success messages. Final startup output now shows `registered/enabled` counts for each item type plus total trader entries; per-item errors and warnings are still logged.
+
 ## v1.2.2
 - **Custom secure containers** — container editor now has an `isSecured` toggle and a raw `properties` JSON editor. Secure containers can be chosen as base templates and their `isSecured` value is preserved.
 - **Raw property preservation** — all item generators now merge raw `properties` from the pack into the generated item, so any extra JSON values are respected instead of dropped.
