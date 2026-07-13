@@ -15,6 +15,7 @@ import {
   HelpCircle,
   Key,
   Map,
+  MapPin,
   Menu,
   Package,
   Plus,
@@ -40,6 +41,7 @@ import {
   StimBuff,
   StimDefinition,
   MedKitDefinition,
+  LootEntry,
   EffectsHealthProperties,
   EffectsDamageProperties,
   TraderDefinition,
@@ -53,6 +55,7 @@ import {
   createDefaultStimBuff,
   createDefaultMedkit,
   createDefaultTraderEntry,
+  createDefaultLootEntry,
   generateMongoId,
   getParentName,
   ITEM_PARENT_NAMES,
@@ -64,6 +67,7 @@ import { CONTAINER_TEMPLATES } from './generated_container_templates'
 import { SECURE_CONTAINER_TEMPLATES } from './generated_secure_container_templates'
 import { STIM_TEMPLATES } from './generated_stim_templates'
 import { MEDKIT_TEMPLATES } from './generated_medkit_templates'
+import { LOOT_CONTAINERS, getLootContainer } from './generated_loot_containers'
 import apiItemNames from '../api_item_names.json'
 import { VanillaBundlesPanel } from './VanillaBundlesPanel'
 
@@ -74,6 +78,7 @@ type Mode = 'items' | 'traders' | 'bundles' | 'vanilla-bundles'
 type RightPanel = 'editor' | 'json'
 
 const RARITY_PVE = ['Not_exist', 'Common', 'Rare', 'Superrare', 'Legendary']
+const LOOT_RARITY = ['Common', 'Rare', 'SuperRare', 'NotExists']
 const HEX24 = /^[0-9a-fA-F]{24}$/
 
 const SPT_COLOR_HEX: Record<string, string> = {
@@ -182,6 +187,11 @@ function validatePack(pack: ItemPackDefinition): ValidationError[] {
     if (!item.description.trim()) errors.push({ field: `${prefix}.description`, message: 'Description is required.' })
     if (item.weight < 0) errors.push({ field: `${prefix}.weight`, message: 'Weight cannot be negative.' })
     if (item.stackMaxSize < 1) errors.push({ field: `${prefix}.stackMaxSize`, message: 'Stack max size must be >= 1.' })
+    if (item.loot?.enabled) {
+      item.loot.containerIds.forEach((id, j) => {
+        if (!HEX24.test(id)) errors.push({ field: `${prefix}.loot.containerIds[${j}]`, message: 'Container ID must be 24 hex characters.' })
+      })
+    }
   })
 
   pack.keys.forEach((key, i) => {
@@ -195,6 +205,11 @@ function validatePack(pack: ItemPackDefinition): ValidationError[] {
     if (!key.description.trim()) errors.push({ field: `${prefix}.description`, message: 'Description is required.' })
     if (key.weight < 0) errors.push({ field: `${prefix}.weight`, message: 'Weight cannot be negative.' })
     if (key.uses < 1) errors.push({ field: `${prefix}.uses`, message: 'Uses must be >= 1.' })
+    if (key.loot?.enabled) {
+      key.loot.containerIds.forEach((id, j) => {
+        if (!HEX24.test(id)) errors.push({ field: `${prefix}.loot.containerIds[${j}]`, message: 'Container ID must be 24 hex characters.' })
+      })
+    }
   })
 
   pack.containers.forEach((container, i) => {
@@ -212,6 +227,11 @@ function validatePack(pack: ItemPackDefinition): ValidationError[] {
     container.safeContainerIds.forEach((id, j) => {
       if (!HEX24.test(id)) errors.push({ field: `${prefix}.safeContainerIds[${j}]`, message: 'Safe container ID must be 24 hex characters.' })
     })
+    if (container.loot?.enabled) {
+      container.loot.containerIds.forEach((id, j) => {
+        if (!HEX24.test(id)) errors.push({ field: `${prefix}.loot.containerIds[${j}]`, message: 'Container ID must be 24 hex characters.' })
+      })
+    }
   })
 
   pack.stims.forEach((stim, i) => {
@@ -228,6 +248,11 @@ function validatePack(pack: ItemPackDefinition): ValidationError[] {
     if (stim.stackMaxSize < 1) errors.push({ field: `${prefix}.stackMaxSize`, message: 'Stack max size must be at least 1.' })
     if (stim.width < 1) errors.push({ field: `${prefix}.width`, message: 'Width must be at least 1.' })
     if (stim.height < 1) errors.push({ field: `${prefix}.height`, message: 'Height must be at least 1.' })
+    if (stim.loot?.enabled) {
+      stim.loot.containerIds.forEach((id, j) => {
+        if (!HEX24.test(id)) errors.push({ field: `${prefix}.loot.containerIds[${j}]`, message: 'Container ID must be 24 hex characters.' })
+      })
+    }
   })
 
   pack.medkits.forEach((medkit, i) => {
@@ -244,6 +269,11 @@ function validatePack(pack: ItemPackDefinition): ValidationError[] {
     if (medkit.stackMaxSize < 1) errors.push({ field: `${prefix}.stackMaxSize`, message: 'Stack max size must be at least 1.' })
     if (medkit.width < 1) errors.push({ field: `${prefix}.width`, message: 'Width must be at least 1.' })
     if (medkit.height < 1) errors.push({ field: `${prefix}.height`, message: 'Height must be at least 1.' })
+    if (medkit.loot?.enabled) {
+      medkit.loot.containerIds.forEach((id, j) => {
+        if (!HEX24.test(id)) errors.push({ field: `${prefix}.loot.containerIds[${j}]`, message: 'Container ID must be 24 hex characters.' })
+      })
+    }
   })
 
   pack.traders.forEach((trader, ti) => {
@@ -318,6 +348,134 @@ function buildExportJson(pack: ItemPackDefinition): string {
     })),
   }
   return JSON.stringify(cleaned, null, 2)
+}
+
+function LootEntryEditor({
+  title,
+  loot,
+  onChange,
+  itemLabel,
+}: {
+  title: string
+  loot: LootEntry
+  onChange: (u: Partial<LootEntry>) => void
+  itemLabel: string
+}) {
+  const [manualId, setManualId] = useState('')
+  const [selectedContainer, setSelectedContainer] = useState('')
+
+  const addContainer = (id: string) => {
+    const trimmed = id.trim()
+    if (!trimmed) return
+    if (loot.containerIds.includes(trimmed)) return
+    onChange({ containerIds: [...loot.containerIds, trimmed] })
+  }
+
+  const removeContainer = (id: string) => {
+    onChange({ containerIds: loot.containerIds.filter((c: string) => c !== id) })
+  }
+
+  return (
+    <div className="mb-6">
+      <div className="text-sm font-semibold text-tarkov-text mb-2">{title}</div>
+      <div className="mb-4">
+        <Toggle checked={loot.enabled} onChange={v => onChange({ enabled: v })} label={itemLabel} />
+      </div>
+
+      {loot.enabled && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <Field
+            label="Container IDs"
+            className="md:col-span-2"
+            tooltip="Select containers from the dropdown or type a 24-char ID manually. The selected item will be added as a possible loot spawn inside these containers (e.g., duffle bags, weapon crates, stashes)."
+          >
+            <div className="flex flex-col gap-3">
+              <div className="flex gap-2">
+                <select
+                  className="input-field flex-1"
+                  value={selectedContainer}
+                  onChange={e => {
+                    const id = e.target.value
+                    setSelectedContainer(id)
+                    if (id) {
+                      addContainer(id)
+                      setSelectedContainer('')
+                    }
+                  }}
+                >
+                  <option value="">Add a container...</option>
+                  {LOOT_CONTAINERS.map(c => (
+                    <option key={c.id} value={c.id}>
+                      {c.name} — {c.id}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="flex gap-2">
+                <input
+                  className="input-field flex-1 font-mono text-sm"
+                  value={manualId}
+                  onChange={e => setManualId(e.target.value)}
+                  onKeyDown={e => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault()
+                      addContainer(manualId)
+                      setManualId('')
+                    }
+                  }}
+                  placeholder="Or enter a container ID manually and press Enter"
+                  maxLength={24}
+                />
+                <button
+                  onClick={() => {
+                    addContainer(manualId)
+                    setManualId('')
+                  }}
+                  className="btn-secondary px-3"
+                  title="Add container"
+                >
+                  <Plus size={18} />
+                </button>
+              </div>
+
+              {loot.containerIds.length > 0 && (
+                <div className="flex flex-wrap gap-2">
+                  {loot.containerIds.map(id => {
+                    const container = getLootContainer(id)
+                    const label = container ? `${container.name} (${id})` : id
+                    return (
+                      <span
+                        key={id}
+                        className="inline-flex items-center gap-1 px-2 py-1 bg-tarkov-surface border border-tarkov-border rounded text-xs font-mono"
+                      >
+                        {label}
+                        <button
+                          onClick={() => removeContainer(id)}
+                          className="text-tarkov-error hover:text-tarkov-error/80"
+                          title="Remove"
+                        >
+                          <X size={14} />
+                        </button>
+                      </span>
+                    )
+                  })}
+                </div>
+              )}
+            </div>
+          </Field>
+
+          <Field label="Rarity" tooltip="Loot rarity for this item in the specified containers.">
+            <select className="input-field" value={loot.rarity} onChange={e => onChange({ rarity: e.target.value })}>
+              {LOOT_RARITY.map(r => (
+                <option key={r} value={r}>{r}</option>
+              ))}
+            </select>
+          </Field>
+        </div>
+      )}
+    </div>
+  )
 }
 
 function RawPropertiesPanel({ properties, onChange, title = 'Raw Properties JSON' }: { properties: Record<string, any>; onChange: (properties: Record<string, any>) => void; title?: string }) {
@@ -642,20 +800,29 @@ export default function App() {
       const normalized: ItemPackDefinition = {
         enabled: imported.enabled ?? true,
         name: imported.name || 'Imported Pack',
-        questItems: imported.questItems || [],
-        keys: imported.keys || [],
+        questItems: (imported.questItems || []).map(q => ({
+          ...q,
+          loot: q.loot ?? createDefaultLootEntry(),
+        })),
+        keys: (imported.keys || []).map(k => ({
+          ...k,
+          loot: k.loot ?? createDefaultLootEntry(),
+        })),
         containers: (imported.containers || []).map(c => ({
           ...c,
           safeContainerMode: c.safeContainerMode ?? 'all',
           safeContainerIds: c.safeContainerIds || [],
+          loot: c.loot ?? createDefaultLootEntry(),
         })),
         stims: (imported.stims || []).map(s => ({
           ...s,
           maxBodyPartsToHeal: s.maxBodyPartsToHeal ?? 0,
+          loot: s.loot ?? createDefaultLootEntry(),
         })),
         medkits: (imported.medkits || []).map(m => ({
           ...m,
           maxBodyPartsToHeal: m.maxBodyPartsToHeal ?? 0,
+          loot: m.loot ?? createDefaultLootEntry(),
         })),
         traders: imported.traders?.length
           ? imported.traders
@@ -1157,6 +1324,15 @@ export default function App() {
                     onChange={updates => updateItem(selectedIndex, updates)}
                   />
                 )}
+
+                <Section title="Loot" icon={<MapPin size={18} />}>
+                  <LootEntryEditor
+                    title="Container Loot"
+                    loot={selectedItem.loot}
+                    onChange={updates => updateItem(selectedIndex, { loot: { ...selectedItem.loot, ...updates } })}
+                    itemLabel={`Add '${selectedItem.shortName || selectedItem.name}' to container loot tables`}
+                  />
+                </Section>
 
                 <Section title="Advanced" icon={<Settings size={18} />}>
                   <Field label="Custom Icon Path (optional)" tooltip="Override the default icon. Path is relative to the mod bundle. Leave empty to inherit from the base template.">

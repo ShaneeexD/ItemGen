@@ -1,8 +1,8 @@
 # Changelog
 
 ## v1.3.5
+- **Container loot pool injection** - every item type can now be added to vanilla container loot tables. The new `Loot` section in the tool lets you enable loot injection, pick container IDs, and set rarity.
 - **Fixed client icon scaling** - fixed a bug where the item icon scaling would affect other items in the stash.
-
 
 ## v1.2.5
 - **Custom secure containers** - a new feature integrated into the existing container section: create a custom container and toggle `isSecured` so it behaves like a secure container in-game.

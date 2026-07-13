@@ -207,5 +207,14 @@ public static class ItemValidator
 
         if (string.IsNullOrWhiteSpace(item.Description))
             errors.Add($"{prefix}: 'description' is required.");
+
+        if (item.Loot?.Enabled == true)
+        {
+            for (var j = 0; j < item.Loot.ContainerIds.Count; j++)
+            {
+                if (string.IsNullOrWhiteSpace(item.Loot.ContainerIds[j]) || !Hex24.IsMatch(item.Loot.ContainerIds[j]))
+                    errors.Add($"{prefix}: 'loot.containerIds[{j}]' must be a 24-character hex string.");
+            }
+        }
     }
 }

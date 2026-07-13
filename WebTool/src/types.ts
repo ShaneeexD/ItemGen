@@ -29,6 +29,21 @@ export interface ItemDefinition {
   rarityPvE: string
   canSellOnRagfair: boolean
   customIcon?: string
+  loot: LootEntry
+}
+
+export interface LootEntry {
+  enabled: boolean
+  containerIds: string[]
+  rarity: string
+}
+
+export function createDefaultLootEntry(): LootEntry {
+  return {
+    enabled: false,
+    containerIds: [],
+    rarity: 'Rare',
+  }
 }
 
 export interface QuestItemDefinition extends ItemDefinition {
@@ -147,6 +162,7 @@ export function createDefaultQuestItem(): QuestItemDefinition {
     stackMaxSize: 1,
     questIds: [],
     properties: {},
+    loot: createDefaultLootEntry(),
   }
 }
 
@@ -167,6 +183,7 @@ export function createDefaultKey(): KeyDefinition {
     keyCategory: '',
     doorIds: [],
     properties: {},
+    loot: createDefaultLootEntry(),
   }
 }
 
@@ -188,6 +205,7 @@ export function createDefaultContainer(): ContainerDefinition {
     properties: {},
     safeContainerMode: 'all',
     safeContainerIds: [],
+    loot: createDefaultLootEntry(),
   }
 }
 
@@ -329,6 +347,7 @@ export function createDefaultStim(): StimDefinition {
     effectsHealth: {},
     effectsDamage: {},
     properties: {},
+    loot: createDefaultLootEntry(),
   }
 }
 
@@ -359,6 +378,7 @@ export function createDefaultMedkit(): MedKitDefinition {
     effectsHealth: {},
     effectsDamage: {},
     properties: {},
+    loot: createDefaultLootEntry(),
   }
 }
 

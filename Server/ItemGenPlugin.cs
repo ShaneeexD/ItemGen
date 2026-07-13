@@ -104,8 +104,17 @@ public class ItemGenPlugin(
             // Add custom items to trader assorts
             var traderEntries = TraderGenerator.RegisterAll(databaseService, packs.Select(p => p.Definition), logger);
 
+            // Inject enabled items into container loot distributions
+            var enabledItems = new List<ItemDefinition>();
+            enabledItems.AddRange(enabledQuestItems);
+            enabledItems.AddRange(enabledKeys);
+            enabledItems.AddRange(enabledContainers);
+            enabledItems.AddRange(enabledStims);
+            enabledItems.AddRange(enabledMedkits);
+            var lootInjections = LootInjector.InjectAll(databaseService, enabledItems, logger, config.Debug);
+
             logger.LogWithColor("[ItemGen] ====================================", LogTextColor.Cyan);
-            logger.LogWithColor($"[ItemGen] Done! Registered {registeredQuestItems}/{enabledQuestItems.Count} custom quest item(s), {registeredKeys}/{enabledKeys.Count} custom key(s), {registeredContainers}/{enabledContainers.Count} custom container(s), {registeredStims}/{enabledStims.Count} custom stim(s), {registeredMedkits}/{enabledMedkits.Count} custom medkit(s), and {traderEntries} trader entry/entries.", LogTextColor.Green);
+            logger.LogWithColor($"[ItemGen] Done! Registered {registeredQuestItems}/{enabledQuestItems.Count} custom quest item(s), {registeredKeys}/{enabledKeys.Count} custom key(s), {registeredContainers}/{enabledContainers.Count} custom container(s), {registeredStims}/{enabledStims.Count} custom stim(s), {registeredMedkits}/{enabledMedkits.Count} custom medkit(s), {traderEntries} trader entry/entries, and {lootInjections} loot injection(s).", LogTextColor.Green);
             logger.LogWithColor("[ItemGen] ====================================", LogTextColor.Cyan);
         }
         catch (Exception ex)

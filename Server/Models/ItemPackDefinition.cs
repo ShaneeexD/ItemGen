@@ -228,6 +228,21 @@ public class ItemDefinition
 
     [JsonPropertyName("customModel")]
     public string? CustomModel { get; set; }
+
+    [JsonPropertyName("loot")]
+    public LootEntry Loot { get; set; } = new();
+}
+
+public class LootEntry
+{
+    [JsonPropertyName("enabled")]
+    public bool Enabled { get; set; }
+
+    [JsonPropertyName("containerIds")]
+    public List<string> ContainerIds { get; set; } = [];
+
+    [JsonPropertyName("rarity")]
+    public string Rarity { get; set; } = "Rare";
 }
 
 public class QuestItemDefinition : ItemDefinition
