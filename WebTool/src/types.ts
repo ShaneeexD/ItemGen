@@ -30,6 +30,7 @@ export interface ItemDefinition {
   canSellOnRagfair: boolean
   customIcon?: string
   loot: LootEntry
+  crafting: CraftingEntry
 }
 
 export interface LootEntry {
@@ -43,6 +44,29 @@ export function createDefaultLootEntry(): LootEntry {
     enabled: false,
     containerIds: [],
     rarity: 'Rare',
+  }
+}
+
+export interface CraftingEntry {
+  enabled: boolean
+  workbenchLevel: number
+  craftTimeSeconds: number
+  outputCount: number
+  requirements: CraftRequirement[]
+}
+
+export interface CraftRequirement {
+  tpl: string
+  count: number
+}
+
+export function createDefaultCraftingEntry(): CraftingEntry {
+  return {
+    enabled: false,
+    workbenchLevel: 2,
+    craftTimeSeconds: 10800,
+    outputCount: 1,
+    requirements: [],
   }
 }
 
@@ -163,6 +187,7 @@ export function createDefaultQuestItem(): QuestItemDefinition {
     questIds: [],
     properties: {},
     loot: createDefaultLootEntry(),
+    crafting: createDefaultCraftingEntry(),
   }
 }
 
@@ -184,6 +209,7 @@ export function createDefaultKey(): KeyDefinition {
     doorIds: [],
     properties: {},
     loot: createDefaultLootEntry(),
+    crafting: createDefaultCraftingEntry(),
   }
 }
 
@@ -206,6 +232,7 @@ export function createDefaultContainer(): ContainerDefinition {
     safeContainerMode: 'all',
     safeContainerIds: [],
     loot: createDefaultLootEntry(),
+    crafting: createDefaultCraftingEntry(),
   }
 }
 
@@ -348,6 +375,7 @@ export function createDefaultStim(): StimDefinition {
     effectsDamage: {},
     properties: {},
     loot: createDefaultLootEntry(),
+    crafting: createDefaultCraftingEntry(),
   }
 }
 
@@ -379,6 +407,7 @@ export function createDefaultMedkit(): MedKitDefinition {
     effectsDamage: {},
     properties: {},
     loot: createDefaultLootEntry(),
+    crafting: createDefaultCraftingEntry(),
   }
 }
 

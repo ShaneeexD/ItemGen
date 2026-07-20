@@ -231,6 +231,9 @@ public class ItemDefinition
 
     [JsonPropertyName("loot")]
     public LootEntry Loot { get; set; } = new();
+
+    [JsonPropertyName("crafting")]
+    public CraftingEntry Crafting { get; set; } = new();
 }
 
 public class LootEntry
@@ -243,6 +246,33 @@ public class LootEntry
 
     [JsonPropertyName("rarity")]
     public string Rarity { get; set; } = "Rare";
+}
+
+public class CraftingEntry
+{
+    [JsonPropertyName("enabled")]
+    public bool Enabled { get; set; }
+
+    [JsonPropertyName("workbenchLevel")]
+    public int WorkbenchLevel { get; set; } = 2;
+
+    [JsonPropertyName("craftTimeSeconds")]
+    public int CraftTimeSeconds { get; set; } = 10800;
+
+    [JsonPropertyName("outputCount")]
+    public int OutputCount { get; set; } = 1;
+
+    [JsonPropertyName("requirements")]
+    public List<CraftRequirement> Requirements { get; set; } = [];
+}
+
+public class CraftRequirement
+{
+    [JsonPropertyName("tpl")]
+    public string Tpl { get; set; } = string.Empty;
+
+    [JsonPropertyName("count")]
+    public int Count { get; set; } = 1;
 }
 
 public class QuestItemDefinition : ItemDefinition

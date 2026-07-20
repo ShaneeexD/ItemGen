@@ -113,8 +113,11 @@ public class ItemGenPlugin(
             enabledItems.AddRange(enabledMedkits);
             var lootInjections = LootInjector.InjectAll(databaseService, enabledItems, logger, config.Debug);
 
+            // Add hideout workbench crafting recipes
+            var craftingRecipes = CraftingManager.RegisterAll(databaseService, enabledItems, logger);
+
             logger.LogWithColor("[ItemGen] ====================================", LogTextColor.Cyan);
-            logger.LogWithColor($"[ItemGen] Done! Registered {registeredQuestItems}/{enabledQuestItems.Count} custom quest item(s), {registeredKeys}/{enabledKeys.Count} custom key(s), {registeredContainers}/{enabledContainers.Count} custom container(s), {registeredStims}/{enabledStims.Count} custom stim(s), {registeredMedkits}/{enabledMedkits.Count} custom medkit(s), {traderEntries} trader entry/entries, and {lootInjections} loot injection(s).", LogTextColor.Green);
+            logger.LogWithColor($"[ItemGen] Done! Registered {registeredQuestItems}/{enabledQuestItems.Count} custom quest item(s), {registeredKeys}/{enabledKeys.Count} custom key(s), {registeredContainers}/{enabledContainers.Count} custom container(s), {registeredStims}/{enabledStims.Count} custom stim(s), {registeredMedkits}/{enabledMedkits.Count} custom medkit(s), {traderEntries} trader entry/entries, {lootInjections} loot injection(s), and {craftingRecipes} crafting recipe(s).", LogTextColor.Green);
             logger.LogWithColor("[ItemGen] ====================================", LogTextColor.Cyan);
         }
         catch (Exception ex)

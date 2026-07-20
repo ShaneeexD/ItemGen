@@ -216,5 +216,26 @@ public static class ItemValidator
                     errors.Add($"{prefix}: 'loot.containerIds[{j}]' must be a 24-character hex string.");
             }
         }
+
+        if (item.Crafting?.Enabled == true)
+        {
+            if (item.Crafting.WorkbenchLevel < 1 || item.Crafting.WorkbenchLevel > 3)
+                errors.Add($"{prefix}: 'crafting.workbenchLevel' must be between 1 and 3.");
+
+            if (item.Crafting.CraftTimeSeconds < 0)
+                errors.Add($"{prefix}: 'crafting.craftTimeSeconds' cannot be negative.");
+
+            if (item.Crafting.OutputCount < 1)
+                errors.Add($"{prefix}: 'crafting.outputCount' must be at least 1.");
+
+            for (var j = 0; j < item.Crafting.Requirements.Count; j++)
+            {
+                var req = item.Crafting.Requirements[j];
+                if (string.IsNullOrWhiteSpace(req.Tpl) || !Hex24.IsMatch(req.Tpl))
+                    errors.Add($"{prefix}: 'crafting.requirements[{j}].tpl' must be a 24-character hex string.");
+                if (req.Count < 1)
+                    errors.Add($"{prefix}: 'crafting.requirements[{j}].count' must be at least 1.");
+            }
+        }
     }
 }

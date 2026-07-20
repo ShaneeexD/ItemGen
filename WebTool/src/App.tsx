@@ -42,6 +42,7 @@ import {
   StimDefinition,
   MedKitDefinition,
   LootEntry,
+  CraftingEntry,
   EffectsHealthProperties,
   EffectsDamageProperties,
   TraderDefinition,
@@ -56,6 +57,7 @@ import {
   createDefaultMedkit,
   createDefaultTraderEntry,
   createDefaultLootEntry,
+  createDefaultCraftingEntry,
   generateMongoId,
   getParentName,
   ITEM_PARENT_NAMES,
@@ -192,6 +194,7 @@ function validatePack(pack: ItemPackDefinition): ValidationError[] {
         if (!HEX24.test(id)) errors.push({ field: `${prefix}.loot.containerIds[${j}]`, message: 'Container ID must be 24 hex characters.' })
       })
     }
+    validateCrafting(item.crafting, prefix, errors)
   })
 
   pack.keys.forEach((key, i) => {
@@ -210,6 +213,7 @@ function validatePack(pack: ItemPackDefinition): ValidationError[] {
         if (!HEX24.test(id)) errors.push({ field: `${prefix}.loot.containerIds[${j}]`, message: 'Container ID must be 24 hex characters.' })
       })
     }
+    validateCrafting(key.crafting, prefix, errors)
   })
 
   pack.containers.forEach((container, i) => {
@@ -232,6 +236,7 @@ function validatePack(pack: ItemPackDefinition): ValidationError[] {
         if (!HEX24.test(id)) errors.push({ field: `${prefix}.loot.containerIds[${j}]`, message: 'Container ID must be 24 hex characters.' })
       })
     }
+    validateCrafting(container.crafting, prefix, errors)
   })
 
   pack.stims.forEach((stim, i) => {
@@ -253,6 +258,7 @@ function validatePack(pack: ItemPackDefinition): ValidationError[] {
         if (!HEX24.test(id)) errors.push({ field: `${prefix}.loot.containerIds[${j}]`, message: 'Container ID must be 24 hex characters.' })
       })
     }
+    validateCrafting(stim.crafting, prefix, errors)
   })
 
   pack.medkits.forEach((medkit, i) => {
@@ -274,6 +280,7 @@ function validatePack(pack: ItemPackDefinition): ValidationError[] {
         if (!HEX24.test(id)) errors.push({ field: `${prefix}.loot.containerIds[${j}]`, message: 'Container ID must be 24 hex characters.' })
       })
     }
+    validateCrafting(medkit.crafting, prefix, errors)
   })
 
   pack.traders.forEach((trader, ti) => {
@@ -291,6 +298,22 @@ function validatePack(pack: ItemPackDefinition): ValidationError[] {
   })
 
   return errors
+}
+
+function validateCrafting(crafting: CraftingEntry | undefined, prefix: string, errors: ValidationError[]) {
+  if (!crafting?.enabled) return
+  if (crafting.workbenchLevel < 1 || crafting.workbenchLevel > 3)
+    errors.push({ field: `${prefix}.crafting.workbenchLevel`, message: 'Workbench level must be 1-3.' })
+  if (crafting.craftTimeSeconds < 0)
+    errors.push({ field: `${prefix}.crafting.craftTimeSeconds`, message: 'Craft time cannot be negative.' })
+  if (crafting.outputCount < 1)
+    errors.push({ field: `${prefix}.crafting.outputCount`, message: 'Output count must be at least 1.' })
+  crafting.requirements.forEach((req, j) => {
+    if (!HEX24.test(req.tpl))
+      errors.push({ field: `${prefix}.crafting.requirements[${j}].tpl`, message: 'Requirement item ID must be 24 hex characters.' })
+    if (req.count < 1)
+      errors.push({ field: `${prefix}.crafting.requirements[${j}].count`, message: 'Count must be at least 1.' })
+  })
 }
 
 function sanitizeProperties(props: Record<string, any>): Record<string, any> {
@@ -475,6 +498,105 @@ function LootEntryEditor({
         </div>
       )}
     </div>
+  )
+}
+
+function CraftingEntryEditor({
+  crafting,
+  onChange,
+}: {
+  crafting: CraftingEntry
+  onChange: (u: Partial<CraftingEntry>) => void
+}) {
+  return (
+    <Section title="Workbench Crafting" icon={<Wrench size={18} />}>
+      <div className="mb-4">
+        <Toggle
+          checked={crafting.enabled}
+          onChange={v => onChange({ enabled: v })}
+          label="Add workbench craft"
+        />
+      </div>
+
+      {crafting.enabled && (
+        <>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+            <Field label="Workbench Level" tooltip="Hideout workbench level required to craft this item.">
+              <input
+                className="input-field"
+                type="number"
+                min={1}
+                max={3}
+                value={crafting.workbenchLevel}
+                onChange={e => onChange({ workbenchLevel: parseInt(e.target.value, 10) || 1 })}
+              />
+            </Field>
+            <Field label="Craft Time (seconds)" tooltip="Time in seconds to complete one craft.">
+              <input
+                className="input-field"
+                type="number"
+                value={crafting.craftTimeSeconds}
+                onChange={e => onChange({ craftTimeSeconds: parseInt(e.target.value, 10) || 0 })}
+              />
+            </Field>
+            <Field label="Output Count" tooltip="Number of items produced per craft completion.">
+              <input
+                className="input-field"
+                type="number"
+                value={crafting.outputCount}
+                onChange={e => onChange({ outputCount: parseInt(e.target.value, 10) || 0 })}
+              />
+            </Field>
+          </div>
+
+          <div>
+            <label className="label">Requirements</label>
+            {crafting.requirements.map((req, i) => (
+              <div key={i} className="flex gap-2 mb-2 items-start">
+                <div className="flex-1 flex flex-col gap-1">
+                  <SearchableSelect
+                    value={req.tpl}
+                    onChange={id => {
+                      const next = [...crafting.requirements]
+                      next[i] = { ...next[i], tpl: id }
+                      onChange({ requirements: next })
+                    }}
+                    options={ALL_ITEM_OPTIONS}
+                    placeholder="Search item name..."
+                  />
+                  {req.tpl && getItemOrCategoryName(req.tpl) && (
+                    <span className="text-xs text-tarkov-text-dim font-mono truncate">{req.tpl}</span>
+                  )}
+                </div>
+                <input
+                  className="input-field w-24"
+                  type="number"
+                  placeholder="Count"
+                  value={req.count}
+                  onChange={e => {
+                    const next = [...crafting.requirements]
+                    next[i] = { ...next[i], count: parseInt(e.target.value, 10) || 0 }
+                    onChange({ requirements: next })
+                  }}
+                />
+                <button
+                  className="btn-danger"
+                  onClick={() => onChange({ requirements: crafting.requirements.filter((_, idx) => idx !== i) })}
+                >
+                  <Trash2 size={16} />
+                </button>
+              </div>
+            ))}
+            <button
+              className="btn-secondary mt-2 flex items-center gap-1.5"
+              onClick={() => onChange({ requirements: [...crafting.requirements, { tpl: '', count: 1 }] })}
+            >
+              <Plus size={14} /> Add Requirement
+            </button>
+          </div>
+        </>
+      )}
+    </Section>
   )
 }
 
@@ -803,26 +925,31 @@ export default function App() {
         questItems: (imported.questItems || []).map(q => ({
           ...q,
           loot: q.loot ?? createDefaultLootEntry(),
+          crafting: q.crafting ?? createDefaultCraftingEntry(),
         })),
         keys: (imported.keys || []).map(k => ({
           ...k,
           loot: k.loot ?? createDefaultLootEntry(),
+          crafting: k.crafting ?? createDefaultCraftingEntry(),
         })),
         containers: (imported.containers || []).map(c => ({
           ...c,
           safeContainerMode: c.safeContainerMode ?? 'all',
           safeContainerIds: c.safeContainerIds || [],
           loot: c.loot ?? createDefaultLootEntry(),
+          crafting: c.crafting ?? createDefaultCraftingEntry(),
         })),
         stims: (imported.stims || []).map(s => ({
           ...s,
           maxBodyPartsToHeal: s.maxBodyPartsToHeal ?? 0,
           loot: s.loot ?? createDefaultLootEntry(),
+          crafting: s.crafting ?? createDefaultCraftingEntry(),
         })),
         medkits: (imported.medkits || []).map(m => ({
           ...m,
           maxBodyPartsToHeal: m.maxBodyPartsToHeal ?? 0,
           loot: m.loot ?? createDefaultLootEntry(),
+          crafting: m.crafting ?? createDefaultCraftingEntry(),
         })),
         traders: imported.traders?.length
           ? imported.traders
@@ -1331,6 +1458,13 @@ export default function App() {
                     loot={selectedItem.loot}
                     onChange={updates => updateItem(selectedIndex, { loot: { ...selectedItem.loot, ...updates } })}
                     itemLabel={`Add '${selectedItem.shortName || selectedItem.name}' to container loot tables`}
+                  />
+                </Section>
+
+                <Section title="Crafting" icon={<Wrench size={18} />}>
+                  <CraftingEntryEditor
+                    crafting={selectedItem.crafting}
+                    onChange={updates => updateItem(selectedIndex, { crafting: { ...selectedItem.crafting, ...updates } })}
                   />
                 </Section>
 

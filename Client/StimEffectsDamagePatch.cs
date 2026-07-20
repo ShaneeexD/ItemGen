@@ -76,6 +76,13 @@ namespace ItemGen.Client
                 return;
             }
 
+            var medKit = GetItemComponent<MedKitComponent>(item);
+            if (medKit != null)
+            {
+                // This is a medkit/healing item, not a stim — do not apply stim-specific damage-effect handling.
+                return;
+            }
+
             var damageEffects = healthEffects.DamageEffects;
             if (damageEffects == null || damageEffects.Count == 0)
             {
@@ -89,8 +96,6 @@ namespace ItemGen.Client
             {
                 return;
             }
-
-            var medKit = GetItemComponent<MedKitComponent>(item);
             var bestBodyPart = FindBestBodyPart(__instance, healthEffects, medKit, bodyPart, damageEffects);
 
             if (bestBodyPart.HasValue)
@@ -298,6 +303,12 @@ namespace ItemGen.Client
                 return;
             }
 
+            var item = GetItemFromMedEffect(__instance);
+            if (item == null || !BundleInjector.IsCustomItem(item.StringTemplateId) || !(item is MedsItemClass))
+            {
+                return;
+            }
+
             var bodyPart = Traverse.Create(__instance).Property("BodyPart").GetValue<EBodyPart>();
             var medKit = Traverse.Create(__instance).Property("MedKitComponent_0").GetValue<MedKitComponent>();
             var damageEffects = healthEffects.DamageEffects;
@@ -339,6 +350,22 @@ namespace ItemGen.Client
             {
                 ApplyEffectsToBodyPart(bodyPartToHeal, healthController, medKit, damageEffects);
             }
+        }
+
+        private static Item GetItemFromMedEffect(object medEffect)
+        {
+            var type = medEffect.GetType();
+            foreach (var prop in type.GetProperties(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance))
+            {
+                if (typeof(Item).IsAssignableFrom(prop.PropertyType))
+                    return prop.GetValue(medEffect) as Item;
+            }
+            foreach (var field in type.GetFields(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance))
+            {
+                if (typeof(Item).IsAssignableFrom(field.FieldType))
+                    return field.GetValue(medEffect) as Item;
+            }
+            return null;
         }
 
         private static int GetMaxBodyParts(string stimulatorBuffs)

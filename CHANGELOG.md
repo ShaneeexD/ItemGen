@@ -2,6 +2,8 @@
 
 ## v1.3.6
 - **Fixed vanilla stims and meds** - the `StimEffectsDamagePatch` no longer runs on vanilla items, so default stims and other misc items can be used in raid again.
+- **Stim-only guard** - the `StimEffectsDamagePatch` and `StimEffectsDamageMultiPatch` now explicitly exit for medkits/non-stim meds, and the multi-patch is gated to custom items only, so modded healing items will not be affected.
+- **Workbench crafting** - every custom item type can now have a hideout workbench craft recipe with requirements, workbench level, craft time, and output count. A new `Crafting` section in the tool lets you configure these recipes.
 
 ## v1.3.5
 - **Container loot pool injection** - every item type can now be added to vanilla container loot tables. The new `Loot` section in the tool lets you enable loot injection, pick container IDs, and set rarity.
