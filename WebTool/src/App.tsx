@@ -4,6 +4,7 @@ import JSZip from 'jszip'
 import { saveAs } from 'file-saver'
 import {
   AlertCircle,
+  Apple,
   ArrowUp,
   ChevronDown,
   ChevronRight,
@@ -41,6 +42,7 @@ import {
   StimBuff,
   StimDefinition,
   MedKitDefinition,
+  FoodDrinkDefinition,
   LootEntry,
   CraftingEntry,
   EffectsHealthProperties,
@@ -55,6 +57,7 @@ import {
   createDefaultStim,
   createDefaultStimBuff,
   createDefaultMedkit,
+  createDefaultFoodDrink,
   createDefaultTraderEntry,
   createDefaultLootEntry,
   createDefaultCraftingEntry,
@@ -69,13 +72,14 @@ import { CONTAINER_TEMPLATES } from './generated_container_templates'
 import { SECURE_CONTAINER_TEMPLATES } from './generated_secure_container_templates'
 import { STIM_TEMPLATES } from './generated_stim_templates'
 import { MEDKIT_TEMPLATES } from './generated_medkit_templates'
+import { FOOD_DRINK_TEMPLATES, KNOWN_FOOD_DRINK_BUFFS } from './generated_food_drink_templates'
 import { LOOT_CONTAINERS, getLootContainer } from './generated_loot_containers'
 import apiItemNames from '../api_item_names.json'
 import { VanillaBundlesPanel } from './VanillaBundlesPanel'
 
 const ALL_CONTAINER_TEMPLATES = [...CONTAINER_TEMPLATES, ...SECURE_CONTAINER_TEMPLATES]
 
-type Tab = 'quest' | 'key' | 'container' | 'stim' | 'medkit'
+type Tab = 'quest' | 'key' | 'container' | 'stim' | 'medkit' | 'fooddrink'
 type Mode = 'items' | 'traders' | 'bundles' | 'vanilla-bundles'
 type RightPanel = 'editor' | 'json'
 
@@ -165,7 +169,7 @@ function validatePack(pack: ItemPackDefinition): ValidationError[] {
   const errors: ValidationError[] = []
   if (!pack.name.trim()) errors.push({ field: 'name', message: 'Pack name is required.' })
 
-  if (pack.questItems.length === 0 && pack.keys.length === 0 && pack.containers.length === 0 && pack.stims.length === 0 && pack.medkits.length === 0) {
+  if (pack.questItems.length === 0 && pack.keys.length === 0 && pack.containers.length === 0 && pack.stims.length === 0 && pack.medkits.length === 0 && pack.foodDrinks.length === 0) {
     errors.push({ field: 'items', message: 'At least one item entry is required.' })
   }
 
@@ -176,6 +180,7 @@ function validatePack(pack: ItemPackDefinition): ValidationError[] {
     ...pack.containers.map(c => c.id),
     ...pack.stims.map(s => s.id),
     ...pack.medkits.map(m => m.id),
+    ...pack.foodDrinks.map(f => f.id),
   ])
 
   pack.questItems.forEach((item, i) => {
@@ -283,6 +288,31 @@ function validatePack(pack: ItemPackDefinition): ValidationError[] {
     validateCrafting(medkit.crafting, prefix, errors)
   })
 
+  pack.foodDrinks.forEach((food, i) => {
+    const prefix = `foodDrinks[${i}]`
+    if (!HEX24.test(food.id)) errors.push({ field: `${prefix}.id`, message: 'Food/Drink ID must be 24 hex characters.' })
+    if (seenIds.has(food.id.toLowerCase())) errors.push({ field: `${prefix}.id`, message: 'Duplicate ID.' })
+    else seenIds.add(food.id.toLowerCase())
+    if (!HEX24.test(food.baseTpl)) errors.push({ field: `${prefix}.baseTpl`, message: 'Base template must be 24 hex characters.' })
+    if (!food.name.trim()) errors.push({ field: `${prefix}.name`, message: 'Name is required.' })
+    if (!food.shortName.trim()) errors.push({ field: `${prefix}.shortName`, message: 'Short name is required.' })
+    if (!food.description.trim()) errors.push({ field: `${prefix}.description`, message: 'Description is required.' })
+    if (food.weight < 0) errors.push({ field: `${prefix}.weight`, message: 'Weight cannot be negative.' })
+    if (food.foodUseTime < 0) errors.push({ field: `${prefix}.foodUseTime`, message: 'Use time cannot be negative.' })
+    if (food.maxResource < 1) errors.push({ field: `${prefix}.maxResource`, message: 'Max resource must be at least 1.' })
+    if (food.resource < 1) errors.push({ field: `${prefix}.resource`, message: 'Resource per use must be at least 1.' })
+    if (food.resource > food.maxResource) errors.push({ field: `${prefix}.resource`, message: 'Resource per use cannot exceed max resource.' })
+    if (food.stackMaxSize < 1) errors.push({ field: `${prefix}.stackMaxSize`, message: 'Stack max size must be at least 1.' })
+    if (food.width < 1) errors.push({ field: `${prefix}.width`, message: 'Width must be at least 1.' })
+    if (food.height < 1) errors.push({ field: `${prefix}.height`, message: 'Height must be at least 1.' })
+    if (food.loot?.enabled) {
+      food.loot.containerIds.forEach((id, j) => {
+        if (!HEX24.test(id)) errors.push({ field: `${prefix}.loot.containerIds[${j}]`, message: 'Container ID must be 24 hex characters.' })
+      })
+    }
+    validateCrafting(food.crafting, prefix, errors)
+  })
+
   pack.traders.forEach((trader, ti) => {
     const tPrefix = `traders[${ti}]`
     if (!HEX24.test(trader.traderId)) errors.push({ field: `${tPrefix}.traderId`, message: 'Trader ID must be 24 hex characters.' })
@@ -368,6 +398,10 @@ function buildExportJson(pack: ItemPackDefinition): string {
     medkits: pack.medkits.map(m => ({
       ...m,
       properties: sanitizeProperties(m.properties || {}),
+    })),
+    foodDrinks: pack.foodDrinks.map(f => ({
+      ...f,
+      properties: sanitizeProperties(f.properties || {}),
     })),
   }
   return JSON.stringify(cleaned, null, 2)
@@ -747,6 +781,7 @@ export default function App() {
   const [selectedContainerIndex, setSelectedContainerIndex] = useState(0)
   const [selectedStimIndex, setSelectedStimIndex] = useState(0)
   const [selectedMedkitIndex, setSelectedMedkitIndex] = useState(0)
+  const [selectedFoodDrinkIndex, setSelectedFoodDrinkIndex] = useState(0)
   const [selectedTraderIndex, setSelectedTraderIndex] = useState(0)
   const [rightPanel, setRightPanel] = useState<RightPanel>('editor')
   const [copyFeedback, setCopyFeedback] = useState<string | null>(null)
@@ -760,9 +795,10 @@ export default function App() {
     if (tab === 'key') return pack.keys
     if (tab === 'stim') return pack.stims
     if (tab === 'medkit') return pack.medkits
+    if (tab === 'fooddrink') return pack.foodDrinks
     return pack.containers
   }, [tab, pack])
-  const selectedIndex = tab === 'quest' ? selectedQuestIndex : tab === 'key' ? selectedKeyIndex : tab === 'stim' ? selectedStimIndex : tab === 'medkit' ? selectedMedkitIndex : selectedContainerIndex
+  const selectedIndex = tab === 'quest' ? selectedQuestIndex : tab === 'key' ? selectedKeyIndex : tab === 'stim' ? selectedStimIndex : tab === 'medkit' ? selectedMedkitIndex : tab === 'fooddrink' ? selectedFoodDrinkIndex : selectedContainerIndex
   const selectedItem = activeItems[selectedIndex]
   const validationErrors = useMemo(() => validatePack(pack), [pack])
 
@@ -770,7 +806,7 @@ export default function App() {
     setPack(next)
   }, [])
 
-  const updateItem = useCallback((index: number, updates: Partial<QuestItemDefinition> | Partial<KeyDefinition> | Partial<ContainerDefinition> | Partial<StimDefinition> | Partial<MedKitDefinition>) => {
+  const updateItem = useCallback((index: number, updates: Partial<QuestItemDefinition> | Partial<KeyDefinition> | Partial<ContainerDefinition> | Partial<StimDefinition> | Partial<MedKitDefinition> | Partial<FoodDrinkDefinition>) => {
     const next = { ...pack }
     let oldId: string | null = null
     let newId: string | null = null
@@ -790,6 +826,10 @@ export default function App() {
       oldId = next.medkits[index]?.id ?? null
       next.medkits = next.medkits.map((item, i) => (i === index ? { ...item, ...updates } as MedKitDefinition : item))
       newId = next.medkits[index]?.id ?? null
+    } else if (tab === 'fooddrink') {
+      oldId = next.foodDrinks[index]?.id ?? null
+      next.foodDrinks = next.foodDrinks.map((item, i) => (i === index ? { ...item, ...updates } as FoodDrinkDefinition : item))
+      newId = next.foodDrinks[index]?.id ?? null
     } else {
       oldId = next.containers[index]?.id ?? null
       next.containers = next.containers.map((item, i) => (i === index ? { ...item, ...updates } as ContainerDefinition : item))
@@ -818,6 +858,9 @@ export default function App() {
     } else if (tab === 'medkit') {
       next.medkits = [...next.medkits, createDefaultMedkit()]
       setSelectedMedkitIndex(next.medkits.length - 1)
+    } else if (tab === 'fooddrink') {
+      next.foodDrinks = [...next.foodDrinks, createDefaultFoodDrink()]
+      setSelectedFoodDrinkIndex(next.foodDrinks.length - 1)
     } else {
       next.containers = [...next.containers, createDefaultContainer()]
       setSelectedContainerIndex(next.containers.length - 1)
@@ -839,12 +882,15 @@ export default function App() {
     } else if (tab === 'medkit') {
       next.medkits = next.medkits.filter((_, i) => i !== index)
       setSelectedMedkitIndex(Math.max(0, Math.min(selectedMedkitIndex, next.medkits.length - 1)))
+    } else if (tab === 'fooddrink') {
+      next.foodDrinks = next.foodDrinks.filter((_, i) => i !== index)
+      setSelectedFoodDrinkIndex(Math.max(0, Math.min(selectedFoodDrinkIndex, next.foodDrinks.length - 1)))
     } else {
       next.containers = next.containers.filter((_, i) => i !== index)
       setSelectedContainerIndex(Math.max(0, Math.min(selectedContainerIndex, next.containers.length - 1)))
     }
     updatePack(next)
-  }, [pack, selectedContainerIndex, selectedKeyIndex, selectedMedkitIndex, selectedQuestIndex, selectedStimIndex, updatePack])
+  }, [pack, selectedContainerIndex, selectedKeyIndex, selectedFoodDrinkIndex, selectedMedkitIndex, selectedQuestIndex, selectedStimIndex, updatePack])
 
   const moveItem = useCallback((index: number, dir: -1 | 1) => {
     const next = { ...pack }
@@ -877,6 +923,13 @@ export default function App() {
       list.splice(newIndex, 0, moved)
       next.medkits = list
       setSelectedMedkitIndex(newIndex)
+    } else if (tab === 'fooddrink') {
+      const list = [...next.foodDrinks]
+      if (newIndex < 0 || newIndex >= list.length) return
+      const [moved] = list.splice(index, 1)
+      list.splice(newIndex, 0, moved)
+      next.foodDrinks = list
+      setSelectedFoodDrinkIndex(newIndex)
     } else {
       const list = [...next.containers]
       if (newIndex < 0 || newIndex >= list.length) return
@@ -951,17 +1004,23 @@ export default function App() {
           loot: m.loot ?? createDefaultLootEntry(),
           crafting: m.crafting ?? createDefaultCraftingEntry(),
         })),
+        foodDrinks: (imported.foodDrinks || []).map(f => ({
+          ...f,
+          loot: f.loot ?? createDefaultLootEntry(),
+          crafting: f.crafting ?? createDefaultCraftingEntry(),
+        })),
         traders: imported.traders?.length
           ? imported.traders
           : VANILLA_TRADERS.map(t => ({ traderId: t.id, enabled: true, entries: [] })),
         bundles: importedBundles.length > 0 ? importedBundles : imported.bundles || [],
       }
       updatePack(normalized)
-      setTab(normalized.questItems.length > 0 ? 'quest' : normalized.keys.length > 0 ? 'key' : normalized.stims.length > 0 ? 'stim' : normalized.medkits.length > 0 ? 'medkit' : 'container')
+      setTab(normalized.questItems.length > 0 ? 'quest' : normalized.keys.length > 0 ? 'key' : normalized.stims.length > 0 ? 'stim' : normalized.medkits.length > 0 ? 'medkit' : normalized.foodDrinks.length > 0 ? 'fooddrink' : 'container')
       setSelectedQuestIndex(0)
       setSelectedKeyIndex(0)
       setSelectedContainerIndex(0)
       setSelectedMedkitIndex(0)
+      setSelectedFoodDrinkIndex(0)
     } catch (e) {
       alert('Invalid pack file: ' + (e as Error).message)
     }
@@ -1072,6 +1131,29 @@ export default function App() {
         effectsDamage: template?.effectsDamage ?? {},
         properties: props,
       } as Partial<MedKitDefinition>)
+    } else if (tab === 'fooddrink') {
+      const template = FOOD_DRINK_TEMPLATES.find(t => t.id === templateId)
+      const props = template?.properties ?? {}
+      updateItem(selectedIndex, {
+        ...baseUpdates,
+        weight: template?.weight ?? (typeof props.Weight === 'number' ? props.Weight : 0.3),
+        backgroundColor: template?.backgroundColor ?? props.BackgroundColor,
+        rarityPvE: template?.rarityPvE ?? props.RarityPvE ?? 'Common',
+        canSellOnRagfair: template?.canSellOnRagfair ?? props.CanSellOnRagfair ?? true,
+        itemSound: template?.itemSound ?? props.ItemSound ?? 'generic',
+        stimulatorBuffs: template?.stimulatorBuffs ?? props.StimulatorBuffs ?? '',
+        customBuffs: [],
+        foodEffectType: template?.foodEffectType ?? props.foodEffectType ?? 'duringUse',
+        foodUseTime: template?.foodUseTime ?? (typeof props.foodUseTime === 'number' ? props.foodUseTime : 2),
+        maxResource: template?.maxResource ?? (typeof props.MaxResource === 'number' ? props.MaxResource : 1),
+        resource: template?.resource ?? (typeof props.Resource === 'number' ? props.Resource : 1),
+        stackMaxSize: template?.stackMaxSize ?? (typeof props.StackMaxSize === 'number' ? props.StackMaxSize : 1),
+        width: template?.width ?? (typeof props.Width === 'number' ? props.Width : 1),
+        height: template?.height ?? (typeof props.Height === 'number' ? props.Height : 1),
+        effectsHealth: template?.effectsHealth ?? {},
+        effectsDamage: template?.effectsDamage ?? {},
+        properties: props,
+      } as Partial<FoodDrinkDefinition>)
     } else {
       const template = ALL_CONTAINER_TEMPLATES.find(t => t.id === templateId)
       const props = template?.properties ?? {}
@@ -1182,16 +1264,17 @@ export default function App() {
                     <option value="container">Containers ({pack.containers.length})</option>
                     <option value="stim">Stims ({pack.stims.length})</option>
                     <option value="medkit">MedKits ({pack.medkits.length})</option>
+                    <option value="fooddrink">Food/Drink ({pack.foodDrinks.length})</option>
                   </select>
                 </Field>
                 <button className="btn-primary w-full text-sm flex items-center justify-center gap-1.5" onClick={addItem}>
-                  <Plus size={14} /> Add {tab === 'quest' ? 'Quest Item' : tab === 'key' ? 'Key' : tab === 'stim' ? 'Stim' : tab === 'medkit' ? 'MedKit' : 'Container'}
+                  <Plus size={14} /> Add {tab === 'quest' ? 'Quest Item' : tab === 'key' ? 'Key' : tab === 'stim' ? 'Stim' : tab === 'medkit' ? 'MedKit' : tab === 'fooddrink' ? 'Food/Drink' : 'Container'}
                 </button>
               </div>
 
               <div ref={listRef} className="flex-1 overflow-y-auto p-2 space-y-2">
                 {activeItems.map((item, i) => {
-                  const listPrefix = tab === 'quest' ? 'questItems' : tab === 'key' ? 'keys' : tab === 'stim' ? 'stims' : tab === 'medkit' ? 'medkits' : 'containers'
+                  const listPrefix = tab === 'quest' ? 'questItems' : tab === 'key' ? 'keys' : tab === 'stim' ? 'stims' : tab === 'medkit' ? 'medkits' : tab === 'fooddrink' ? 'foodDrinks' : 'containers'
                   const hasErrors = validationErrors.some(e => e.field.startsWith(`${listPrefix}[${i}]`))
                   return (
                     <div
@@ -1206,6 +1289,7 @@ export default function App() {
                         else if (tab === 'key') setSelectedKeyIndex(i)
                         else if (tab === 'stim') setSelectedStimIndex(i)
                         else if (tab === 'medkit') setSelectedMedkitIndex(i)
+                        else if (tab === 'fooddrink') setSelectedFoodDrinkIndex(i)
                         else setSelectedContainerIndex(i)
                       }}
                     >
@@ -1219,13 +1303,13 @@ export default function App() {
                   )
                 })}
                 {activeItems.length === 0 && (
-                  <div className="text-sm text-tarkov-text-dim text-center py-4">No {tab === 'quest' ? 'quest items' : tab === 'key' ? 'keys' : tab === 'stim' ? 'stims' : tab === 'medkit' ? 'medkits' : 'containers'} yet.</div>
+                  <div className="text-sm text-tarkov-text-dim text-center py-4">No {tab === 'quest' ? 'quest items' : tab === 'key' ? 'keys' : tab === 'stim' ? 'stims' : tab === 'medkit' ? 'medkits' : tab === 'fooddrink' ? 'food/drink items' : 'containers'} yet.</div>
                 )}
               </div>
 
               <div className="p-3 border-t border-tarkov-border space-y-2">
                 <button className="btn-primary w-full text-sm flex items-center justify-center gap-1.5" onClick={addItem}>
-                  <Plus size={14} /> Add {tab === 'quest' ? 'Quest Item' : tab === 'key' ? 'Key' : tab === 'stim' ? 'Stim' : tab === 'medkit' ? 'MedKit' : 'Container'}
+                  <Plus size={14} /> Add {tab === 'quest' ? 'Quest Item' : tab === 'key' ? 'Key' : tab === 'stim' ? 'Stim' : tab === 'medkit' ? 'MedKit' : tab === 'fooddrink' ? 'Food/Drink' : 'Container'}
                 </button>
               </div>
             </>
@@ -1313,17 +1397,17 @@ export default function App() {
 
                 <Section title="Identity" icon={<Fingerprint size={18} />}>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <Field label="Item ID" tooltip="Unique 24-character hex ID for this custom item. Used by quests, traders, and other mods to reference it." error={errorsByField(`${tab === 'quest' ? 'questItems' : tab === 'key' ? 'keys' : tab === 'medkit' ? 'medkits' : 'containers'}[${selectedIndex}].id`).length > 0}>
+                    <Field label="Item ID" tooltip="Unique 24-character hex ID for this custom item. Used by quests, traders, and other mods to reference it." error={errorsByField(`${tab === 'quest' ? 'questItems' : tab === 'key' ? 'keys' : tab === 'medkit' ? 'medkits' : tab === 'fooddrink' ? 'foodDrinks' : 'containers'}[${selectedIndex}].id`).length > 0}>
                       <div className="flex gap-2">
                         <input className="input-field flex-1 font-mono text-sm" value={selectedItem.id} onChange={e => updateItem(selectedIndex, { id: e.target.value })} maxLength={24} />
                         <button className="btn-secondary text-xs px-2" onClick={() => updateItem(selectedIndex, { id: generateMongoId() })} title="Regenerate ID">
                           <RefreshCw size={14} />
                         </button>
                       </div>
-                      <FieldErrors errors={errorsByField(`${tab === 'quest' ? 'questItems' : tab === 'key' ? 'keys' : tab === 'medkit' ? 'medkits' : 'containers'}[${selectedIndex}].id`)} />
+                      <FieldErrors errors={errorsByField(`${tab === 'quest' ? 'questItems' : tab === 'key' ? 'keys' : tab === 'medkit' ? 'medkits' : tab === 'fooddrink' ? 'foodDrinks' : 'containers'}[${selectedIndex}].id`)} />
                     </Field>
 
-                    <Field label="Base Template" tooltip={`Vanilla item to clone. The new item inherits the parent category, handbook category, and model unless overridden. Search all SPT items below; keys, quest items, containers, stims and medkits are included.`} error={errorsByField(`${tab === 'quest' ? 'questItems' : tab === 'key' ? 'keys' : tab === 'medkit' ? 'medkits' : 'containers'}[${selectedIndex}].baseTpl`).length > 0}>
+                    <Field label="Base Template" tooltip={`Vanilla item to clone. The new item inherits the parent category, handbook category, and model unless overridden. Search all SPT items below; keys, quest items, containers, stims, medkits, and food/drink items are included.`} error={errorsByField(`${tab === 'quest' ? 'questItems' : tab === 'key' ? 'keys' : tab === 'medkit' ? 'medkits' : tab === 'fooddrink' ? 'foodDrinks' : 'containers'}[${selectedIndex}].baseTpl`).length > 0}>
                       <SearchableSelect
                         value={selectedItem.baseTpl}
                         onChange={id => selectTemplate(id)}
@@ -1335,7 +1419,7 @@ export default function App() {
                           {selectedItem.baseTpl} {getParentDisplay(selectedItem.baseTpl, tab)}
                         </div>
                       )}
-                      <FieldErrors errors={errorsByField(`${tab === 'quest' ? 'questItems' : tab === 'key' ? 'keys' : tab === 'medkit' ? 'medkits' : 'containers'}[${selectedIndex}].baseTpl`)} />
+                      <FieldErrors errors={errorsByField(`${tab === 'quest' ? 'questItems' : tab === 'key' ? 'keys' : tab === 'medkit' ? 'medkits' : tab === 'fooddrink' ? 'foodDrinks' : 'containers'}[${selectedIndex}].baseTpl`)} />
                     </Field>
                   </div>
 
@@ -1437,11 +1521,18 @@ export default function App() {
                   </Section>
                 )}
 
-                {'stimulatorBuffs' in selectedItem && (
+                {'stimulatorBuffs' in selectedItem && (tab === 'stim' || tab === 'medkit') && (
                   <StimSpecifics
                     stim={selectedItem as StimDefinition}
                     onChange={updates => updateItem(selectedIndex, updates as Partial<StimDefinition>)}
                     mode={tab === 'medkit' ? 'medkit' : 'stim'}
+                  />
+                )}
+
+                {'foodEffectType' in selectedItem && (
+                  <FoodDrinkSpecifics
+                    food={selectedItem as FoodDrinkDefinition}
+                    onChange={updates => updateItem(selectedIndex, updates as Partial<FoodDrinkDefinition>)}
                   />
                 )}
 
@@ -1562,6 +1653,10 @@ function getTemplateName(id: string, tab: Tab): string {
     const t = MEDKIT_TEMPLATES.find(x => x.id === id)
     return t ? t.displayName : ''
   }
+  if (tab === 'fooddrink') {
+    const t = FOOD_DRINK_TEMPLATES.find(x => x.id === id)
+    return t ? t.displayName : (getItemOrCategoryName(id) ?? '')
+  }
   const t = ALL_CONTAINER_TEMPLATES.find(x => x.id === id)
   return t ? t.displayName : ''
 }
@@ -1581,6 +1676,10 @@ function getTemplateParent(id: string, tab: Tab): string {
   }
   if (tab === 'medkit') {
     const t = MEDKIT_TEMPLATES.find(x => x.id === id)
+    return t ? t.parent : ''
+  }
+  if (tab === 'fooddrink') {
+    const t = FOOD_DRINK_TEMPLATES.find(x => x.id === id)
     return t ? t.parent : ''
   }
   const t = ALL_CONTAINER_TEMPLATES.find(x => x.id === id)
@@ -1612,7 +1711,7 @@ function TraderEditor({ pack, traderIndex, onChange }: { pack: ItemPackDefinitio
   }
 
   const addEntry = () => {
-    const allItems = [...pack.questItems, ...pack.keys, ...pack.containers, ...pack.stims, ...pack.medkits]
+    const allItems = [...pack.questItems, ...pack.keys, ...pack.containers, ...pack.stims, ...pack.medkits, ...pack.foodDrinks]
     const itemId = allItems[0]?.id || ''
     updateTrader({ entries: [...trader.entries, createDefaultTraderEntry(itemId)] })
   }
@@ -1621,7 +1720,7 @@ function TraderEditor({ pack, traderIndex, onChange }: { pack: ItemPackDefinitio
     updateTrader({ entries: trader.entries.filter((_, i) => i !== index) })
   }
 
-  const allItems = [...pack.questItems, ...pack.keys, ...pack.containers, ...pack.stims, ...pack.medkits]
+  const allItems = [...pack.questItems, ...pack.keys, ...pack.containers, ...pack.stims, ...pack.medkits, ...pack.foodDrinks]
   const itemOptions = allItems.map(item => ({
     value: item.id,
     label: `${item.name} (${item.shortName})`,
@@ -2113,6 +2212,280 @@ function StimSpecifics({ stim, onChange, mode = 'stim' }: StimSpecificsProps) {
 
             <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
               <Field label="Cost" tooltip="HP resource cost to remove the effect. For medkits this is the amount of HP resource consumed to cure the effect.">
+                <input className="input-field" type="number" min={0} step="0.01" value={effect.cost ?? ''} onChange={e => updateDamageEffect(key, { cost: e.target.value === '' ? undefined : parseFloat(e.target.value) })} />
+              </Field>
+              <Field label="Delay (s)" tooltip="Seconds before the effect starts.">
+                <input className="input-field" type="number" min={0} step="0.01" value={effect.delay ?? ''} onChange={e => updateDamageEffect(key, { delay: e.target.value === '' ? undefined : parseFloat(e.target.value) })} />
+              </Field>
+              <Field label="Duration (s)" tooltip="How long the effect lasts.">
+                <input className="input-field" type="number" min={0} step="0.01" value={effect.duration ?? ''} onChange={e => updateDamageEffect(key, { duration: e.target.value === '' ? undefined : parseFloat(e.target.value) })} />
+              </Field>
+              <Field label="Fade Out (s)" tooltip="Fade out duration of the effect.">
+                <input className="input-field" type="number" min={0} step="0.01" value={effect.fadeOut ?? ''} onChange={e => updateDamageEffect(key, { fadeOut: e.target.value === '' ? undefined : parseFloat(e.target.value) })} />
+              </Field>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mt-3">
+              <Field label="Health Penalty Min" tooltip="Minimum health penalty.">
+                <input className="input-field" type="number" step="0.01" value={effect.healthPenaltyMin ?? ''} onChange={e => updateDamageEffect(key, { healthPenaltyMin: e.target.value === '' ? undefined : parseFloat(e.target.value) })} />
+              </Field>
+              <Field label="Health Penalty Max" tooltip="Maximum health penalty.">
+                <input className="input-field" type="number" step="0.01" value={effect.healthPenaltyMax ?? ''} onChange={e => updateDamageEffect(key, { healthPenaltyMax: e.target.value === '' ? undefined : parseFloat(e.target.value) })} />
+              </Field>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <RawPropertiesPanel properties={props} onChange={next => onChange({ properties: next })} />
+    </Section>
+  )
+}
+
+interface FoodDrinkSpecificsProps {
+  food: FoodDrinkDefinition
+  onChange: (updates: Partial<FoodDrinkDefinition>) => void
+}
+
+function FoodDrinkSpecifics({ food, onChange }: FoodDrinkSpecificsProps) {
+  const props = food.properties || {}
+
+  const updateProp = (key: string, value: any) => {
+    const next = { ...props, [key]: value }
+    onChange({ properties: next })
+  }
+
+  const updateHealthEffect = (key: string, updates: Partial<EffectsHealthProperties>) => {
+    const next = { ...food.effectsHealth, [key]: { ...(food.effectsHealth[key] ?? {}), ...updates } }
+    onChange({ effectsHealth: next })
+  }
+
+  const removeHealthEffect = (key: string) => {
+    const { [key]: _, ...next } = food.effectsHealth
+    onChange({ effectsHealth: next })
+  }
+
+  const addHealthEffect = (key: string) => {
+    if (key && !food.effectsHealth[key]) {
+      onChange({ effectsHealth: { ...food.effectsHealth, [key]: {} } })
+    }
+  }
+
+  const updateDamageEffect = (key: string, updates: Partial<EffectsDamageProperties>) => {
+    const next = { ...food.effectsDamage, [key]: { ...(food.effectsDamage[key] ?? {}), ...updates } }
+    onChange({ effectsDamage: next })
+  }
+
+  const removeDamageEffect = (key: string) => {
+    const { [key]: _, ...next } = food.effectsDamage
+    onChange({ effectsDamage: next })
+  }
+
+  const addDamageEffect = (key: string) => {
+    if (key && !food.effectsDamage[key]) {
+      onChange({ effectsDamage: { ...food.effectsDamage, [key]: {} } })
+    }
+  }
+
+  const updateBuff = (index: number, updates: Partial<StimBuff>) => {
+    const next = food.customBuffs.map((b, i) => (i === index ? { ...b, ...updates } : b))
+    onChange({ customBuffs: next })
+  }
+
+  const addBuff = () => {
+    onChange({ customBuffs: [...food.customBuffs, createDefaultStimBuff()] })
+  }
+
+  const removeBuff = (index: number) => {
+    onChange({ customBuffs: food.customBuffs.filter((_, i) => i !== index) })
+  }
+
+  const isCustomBuff = food.stimulatorBuffs !== '' && !KNOWN_FOOD_DRINK_BUFFS.includes(food.stimulatorBuffs)
+
+  const setStimulatorBuffs = (value: string) => {
+    const nextProps = { ...food.properties, StimulatorBuffs: value }
+    onChange({ stimulatorBuffs: value, properties: nextProps })
+  }
+
+  return (
+    <Section title="Food / Drink Specifics" icon={<Apple size={18} />}>
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <Field label="Food Effect Type" tooltip="When the food/drink effect applies.">
+          <select className="input-field" value={food.foodEffectType} onChange={e => onChange({ foodEffectType: e.target.value })}>
+            {MED_EFFECT_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+          </select>
+        </Field>
+        <Field label="Use Time" tooltip="Consumption time in seconds.">
+          <input className="input-field" type="number" min={0} step="0.1" value={food.foodUseTime} onChange={e => onChange({ foodUseTime: parseFloat(e.target.value) || 0 })} />
+        </Field>
+        <Field label="Item Sound" tooltip="Sound identifier used when moving the item. E.g. food_eat or food_drink.">
+          <input className="input-field" value={food.itemSound} onChange={e => onChange({ itemSound: e.target.value })} />
+        </Field>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mt-4">
+        <Field label="Max Resource" tooltip="Total resource units. Set to 1 for a one-use item; set higher for items with multiple uses (e.g. a water bottle).">
+          <input className="input-field" type="number" min={1} value={food.maxResource} onChange={e => onChange({ maxResource: parseInt(e.target.value) || 1 })} />
+        </Field>
+        <Field label="Resource Per Use" tooltip="Units consumed each time the item is used. For a one-use item, set equal to Max Resource.">
+          <input className="input-field" type="number" min={1} value={food.resource} onChange={e => onChange({ resource: parseInt(e.target.value) || 1 })} />
+        </Field>
+        <Field label="Stack Max Size" tooltip="Maximum number of this item that can stack in one cell.">
+          <input className="input-field" type="number" min={1} value={food.stackMaxSize} onChange={e => onChange({ stackMaxSize: parseInt(e.target.value) || 1 })} />
+        </Field>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+        <Field label="Width" tooltip="Inventory cell width.">
+          <input className="input-field" type="number" min={1} value={food.width} onChange={e => onChange({ width: parseInt(e.target.value) || 1 })} />
+        </Field>
+        <Field label="Height" tooltip="Inventory cell height.">
+          <input className="input-field" type="number" min={1} value={food.height} onChange={e => onChange({ height: parseInt(e.target.value) || 1 })} />
+        </Field>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+        <Field label="Custom Model" tooltip="Custom bundle filename for the loot/inventory model (e.g. my_food.bundle). The client plugin matches this to a file in BepInEx\plugins\Serenity-ItemGen\bundles. Leave empty to inherit from the base template.">
+          <input className="input-field" value={props.Prefab?.path ?? ''} onChange={e => updateProp('Prefab', { ...props.Prefab, path: e.target.value })} placeholder="my_food.bundle" />
+        </Field>
+        <Field label="Use Model" tooltip="Custom bundle filename for the in-hand/use animation model. Leave empty to inherit from the base template.">
+          <input className="input-field" value={props.UsePrefab?.path ?? ''} onChange={e => updateProp('UsePrefab', { ...props.UsePrefab, path: e.target.value })} placeholder="my_food.bundle" />
+        </Field>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
+        <Field label="Buff Set" tooltip="Existing vanilla buff set to use as a base, or leave as (Nothing) to rely on the custom buffs below. If custom buffs are defined, the server will patch globals and reference that set here.">
+          <select className="input-field" value={isCustomBuff ? 'Custom' : food.stimulatorBuffs} onChange={e => setStimulatorBuffs(e.target.value === 'Custom' ? '' : e.target.value)}>
+            <option value="">(Nothing)</option>
+            {KNOWN_FOOD_DRINK_BUFFS.map(b => <option key={b} value={b}>{b}</option>)}
+            <option value="Custom">Custom</option>
+          </select>
+          {isCustomBuff && <input className="input-field mt-2" value={food.stimulatorBuffs} onChange={e => setStimulatorBuffs(e.target.value)} placeholder="Custom buff set name..." />}
+        </Field>
+      </div>
+
+      <div className="mt-6">
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="text-sm font-semibold text-tarkov-text">Custom Buffs</h3>
+          <button className="btn-secondary text-xs flex items-center gap-1" onClick={addBuff}>
+            <Plus size={14} /> Add Buff
+          </button>
+        </div>
+
+        {food.customBuffs.length === 0 && (
+          <div className="text-sm text-tarkov-text-dim bg-tarkov-bg border border-tarkov-border rounded p-3">
+            No custom buffs. Add buffs to fully customize the food/drink effects, or pick an existing Buff Set above.
+          </div>
+        )}
+
+        {food.customBuffs.map((buff, i) => (
+          <div key={buff.id} className="card p-3 mb-3 bg-tarkov-bg border border-tarkov-border">
+            <div className="flex items-center justify-between mb-3">
+              <span className="text-xs font-semibold text-tarkov-text-dim uppercase">Buff {i + 1}</span>
+              <button className="btn-danger text-xs flex items-center gap-1" onClick={() => removeBuff(i)}>
+                <Trash2 size={14} /> Remove
+              </button>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              <Field label="Type" tooltip="Buff effect type. SkillRate requires a skill name. EnergyRate/HydrationRate affect hunger and thirst over time.">
+                <select className="input-field" value={STIM_BUFF_TYPES.includes(buff.buffType) ? buff.buffType : 'Custom'} onChange={e => updateBuff(i, { buffType: e.target.value === 'Custom' ? '' : e.target.value })}>
+                  {STIM_BUFF_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+                </select>
+                {(!STIM_BUFF_TYPES.includes(buff.buffType) || buff.buffType === 'Custom') && (
+                  <input className="input-field mt-2" value={buff.buffType} onChange={e => updateBuff(i, { buffType: e.target.value })} placeholder="Custom type..." />
+                )}
+              </Field>
+              <Field label="Skill Name" tooltip="Skill affected when Type is SkillRate. Choose 'Custom' to type a skill not listed.">
+                <select className="input-field" value={SKILL_NAMES.includes(buff.skillName) ? buff.skillName : 'Custom'} onChange={e => updateBuff(i, { skillName: e.target.value === 'Custom' ? '' : e.target.value })} disabled={buff.buffType !== 'SkillRate'}>
+                  {SKILL_NAMES.map(s => <option key={s} value={s}>{s}</option>)}
+                </select>
+                {buff.buffType === 'SkillRate' && !SKILL_NAMES.includes(buff.skillName) && (
+                  <input className="input-field mt-2" value={buff.skillName} onChange={e => updateBuff(i, { skillName: e.target.value })} placeholder="Custom skill name..." />
+                )}
+              </Field>
+              <Field label="Value" tooltip="Positive for buff, negative for nerf. For EnergyRate/HydrationRate, negative drains hunger/thirst over time.">
+                <input className="input-field" type="number" step="0.01" value={buff.value} onChange={e => updateBuff(i, { value: parseFloat(e.target.value) || 0 })} />
+              </Field>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-3 mt-3">
+              <Field label="Delay (s)" tooltip="Seconds before the buff starts.">
+                <input className="input-field" type="number" min={0} step="0.01" value={buff.delay} onChange={e => updateBuff(i, { delay: parseFloat(e.target.value) || 0 })} />
+              </Field>
+              <Field label="Duration (s)" tooltip="How long the buff lasts.">
+                <input className="input-field" type="number" min={0} step="0.01" value={buff.duration} onChange={e => updateBuff(i, { duration: parseFloat(e.target.value) || 0 })} />
+              </Field>
+              <Field label="Chance" tooltip="0-1 chance for the buff to apply.">
+                <input className="input-field" type="number" min={0} max={1} step="0.01" value={buff.chance} onChange={e => updateBuff(i, { chance: parseFloat(e.target.value) || 0 })} />
+              </Field>
+              <Field label="Absolute Value" tooltip="Whether the value is an absolute amount rather than a multiplier.">
+                <Toggle checked={buff.absoluteValue} onChange={v => updateBuff(i, { absoluteValue: v })} />
+              </Field>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <div className="mt-6">
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="text-sm font-semibold text-tarkov-text">Health Effects</h3>
+          <EffectSelector options={HEALTH_FACTORS} onSelect={addHealthEffect} label="Add health effect" />
+        </div>
+
+        {Object.keys(food.effectsHealth).length === 0 && (
+          <div className="text-sm text-tarkov-text-dim bg-tarkov-bg border border-tarkov-border rounded p-3">
+            No health effects. Add Hydration/Energy to restore hunger/thirst.
+          </div>
+        )}
+
+        {Object.entries(food.effectsHealth).map(([key, effect]) => (
+          <div key={key} className="card p-3 mb-3 bg-tarkov-bg border border-tarkov-border">
+            <div className="flex items-center justify-between mb-3">
+              <span className="text-xs font-semibold text-tarkov-text-dim uppercase">{key}</span>
+              <button className="btn-danger text-xs flex items-center gap-1" onClick={() => removeHealthEffect(key)}>
+                <Trash2 size={14} /> Remove
+              </button>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              <Field label="Value" tooltip="Magnitude of the health effect.">
+                <input className="input-field" type="number" step="0.01" value={effect.value ?? ''} onChange={e => updateHealthEffect(key, { value: e.target.value === '' ? undefined : parseFloat(e.target.value) })} />
+              </Field>
+              <Field label="Delay (s)" tooltip="Seconds before the effect starts.">
+                <input className="input-field" type="number" min={0} step="0.01" value={effect.delay ?? ''} onChange={e => updateHealthEffect(key, { delay: e.target.value === '' ? undefined : parseFloat(e.target.value) })} />
+              </Field>
+              <Field label="Duration (s)" tooltip="How long the effect lasts.">
+                <input className="input-field" type="number" min={0} step="0.01" value={effect.duration ?? ''} onChange={e => updateHealthEffect(key, { duration: e.target.value === '' ? undefined : parseFloat(e.target.value) })} />
+              </Field>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <div className="mt-6">
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="text-sm font-semibold text-tarkov-text">Damage Effects</h3>
+          <EffectSelector options={DAMAGE_EFFECT_TYPES} onSelect={addDamageEffect} label="Add damage effect" />
+        </div>
+
+        {Object.keys(food.effectsDamage).length === 0 && (
+          <div className="text-sm text-tarkov-text-dim bg-tarkov-bg border border-tarkov-border rounded p-3">
+            No damage effects. Add effects the item causes, like Radiation.
+          </div>
+        )}
+
+        {Object.entries(food.effectsDamage).map(([key, effect]) => (
+          <div key={key} className="card p-3 mb-3 bg-tarkov-bg border border-tarkov-border">
+            <div className="flex items-center justify-between mb-3">
+              <span className="text-xs font-semibold text-tarkov-text-dim uppercase">{key}</span>
+              <button className="btn-danger text-xs flex items-center gap-1" onClick={() => removeDamageEffect(key)}>
+                <Trash2 size={14} /> Remove
+              </button>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+              <Field label="Cost" tooltip="Resource cost to remove the effect.">
                 <input className="input-field" type="number" min={0} step="0.01" value={effect.cost ?? ''} onChange={e => updateDamageEffect(key, { cost: e.target.value === '' ? undefined : parseFloat(e.target.value) })} />
               </Field>
               <Field label="Delay (s)" tooltip="Seconds before the effect starts.">

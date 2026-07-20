@@ -28,6 +28,9 @@ public class ItemPackDefinition
     [JsonPropertyName("medkits")]
     public List<MedKitDefinition> Medkits { get; set; } = [];
 
+    [JsonPropertyName("foodDrinks")]
+    public List<FoodDrinkDefinition> FoodDrinks { get; set; } = [];
+
     [JsonPropertyName("traders")]
     public List<TraderDefinition> Traders { get; set; } = [];
 }
@@ -135,6 +138,48 @@ public class MedKitDefinition : ItemDefinition
 
     [JsonPropertyName("height")]
     public int Height { get; set; } = 2;
+
+    [JsonPropertyName("effectsHealth")]
+    public Dictionary<string, EffectsHealthProperties>? EffectsHealth { get; set; }
+
+    [JsonPropertyName("effectsDamage")]
+    public Dictionary<string, EffectsDamageProperties>? EffectsDamage { get; set; }
+
+    [JsonPropertyName("properties")]
+    public JsonElement Properties { get; set; }
+}
+
+public class FoodDrinkDefinition : ItemDefinition
+{
+    [JsonPropertyName("itemSound")]
+    public string ItemSound { get; set; } = "food_eat";
+
+    [JsonPropertyName("foodEffectType")]
+    public string FoodEffectType { get; set; } = "duringUse";
+
+    [JsonPropertyName("foodUseTime")]
+    public float FoodUseTime { get; set; } = 2;
+
+    [JsonPropertyName("maxResource")]
+    public int MaxResource { get; set; } = 1;
+
+    [JsonPropertyName("resource")]
+    public int Resource { get; set; } = 1;
+
+    [JsonPropertyName("stackMaxSize")]
+    public int StackMaxSize { get; set; } = 1;
+
+    [JsonPropertyName("width")]
+    public int Width { get; set; } = 1;
+
+    [JsonPropertyName("height")]
+    public int Height { get; set; } = 1;
+
+    [JsonPropertyName("stimulatorBuffs")]
+    public string StimulatorBuffs { get; set; } = string.Empty;
+
+    [JsonPropertyName("customBuffs")]
+    public List<StimBuff> CustomBuffs { get; set; } = [];
 
     [JsonPropertyName("effectsHealth")]
     public Dictionary<string, EffectsHealthProperties>? EffectsHealth { get; set; }

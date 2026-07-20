@@ -19,8 +19,9 @@ public static class ItemValidator
         var containerList = pack.Containers ?? [];
         var stimList = pack.Stims ?? [];
         var medkitList = pack.Medkits ?? [];
+        var foodDrinkList = pack.FoodDrinks ?? [];
 
-        if (questList.Count == 0 && keyList.Count == 0 && containerList.Count == 0 && stimList.Count == 0 && medkitList.Count == 0)
+        if (questList.Count == 0 && keyList.Count == 0 && containerList.Count == 0 && stimList.Count == 0 && medkitList.Count == 0 && foodDrinkList.Count == 0)
         {
             errors.Add($"Pack '{fileName}': at least one item entry is required.");
             return errors;
@@ -144,6 +145,37 @@ public static class ItemValidator
                 errors.Add($"{prefix}: 'width' must be at least 1.");
 
             if (medkit.Height < 1)
+                errors.Add($"{prefix}: 'height' must be at least 1.");
+        }
+
+        for (var i = 0; i < foodDrinkList.Count; i++)
+        {
+            var food = foodDrinkList[i];
+            var prefix = $"FoodDrink[{i}]";
+            ValidateItem(food, prefix, errors, seenIds);
+
+            if (food.Weight < 0)
+                errors.Add($"{prefix}: 'weight' cannot be negative.");
+
+            if (food.FoodUseTime < 0)
+                errors.Add($"{prefix}: 'foodUseTime' cannot be negative.");
+
+            if (food.MaxResource < 1)
+                errors.Add($"{prefix}: 'maxResource' must be at least 1.");
+
+            if (food.Resource < 1)
+                errors.Add($"{prefix}: 'resource' must be at least 1.");
+
+            if (food.Resource > food.MaxResource)
+                errors.Add($"{prefix}: 'resource' cannot be greater than 'maxResource'.");
+
+            if (food.StackMaxSize < 1)
+                errors.Add($"{prefix}: 'stackMaxSize' must be at least 1.");
+
+            if (food.Width < 1)
+                errors.Add($"{prefix}: 'width' must be at least 1.");
+
+            if (food.Height < 1)
                 errors.Add($"{prefix}: 'height' must be at least 1.");
         }
 

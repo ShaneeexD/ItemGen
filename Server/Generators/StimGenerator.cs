@@ -126,7 +126,8 @@ public static class StimGenerator
 
         if (result.Success == true)
         {
-            PatchStimulatorBuffs(databaseService, def, buffSetKey, logger);
+            var needsBuffKey = def.CustomBuffs.Count > 0 || def.MaxBodyPartsToHeal > 0;
+            PatchStimulatorBuffs(databaseService, def.Id, def.Name, def.StimulatorBuffs, def.CustomBuffs, buffSetKey, needsBuffKey, logger, true);
 
             var items = databaseService.GetItems();
             if (items.TryGetValue(def.Id, out var tpl) && tpl.Properties != null)
@@ -157,13 +158,17 @@ public static class StimGenerator
         return false;
     }
 
-    private static void PatchStimulatorBuffs(
+    public static void PatchStimulatorBuffs(
         DatabaseService databaseService,
-        StimDefinition def,
+        string itemId,
+        string itemName,
+        string stimulatorBuffsName,
+        IReadOnlyList<StimBuff> customBuffs,
         string buffSetKey,
-        ISptLogger<ItemGenPlugin> logger)
+        bool needsBuffKey,
+        ISptLogger<ItemGenPlugin> logger,
+        bool clearEffects)
     {
-        var needsBuffKey = def.CustomBuffs.Count > 0 || def.MaxBodyPartsToHeal > 0;
         if (!needsBuffKey)
         {
             return;
@@ -172,18 +177,18 @@ public static class StimGenerator
         try
         {
             var globals = databaseService.GetGlobals();
-            var stimulatorBuffs = FindStimulatorBuffs(globals, logger, def.Name);
+            var stimulatorBuffs = FindStimulatorBuffs(globals, logger, itemName);
 
             if (stimulatorBuffs == null)
             {
-                logger.LogWithColor($"[ItemGen] Could not patch stimulator buffs for '{def.Name}' - globals structure not found.", LogTextColor.Yellow);
+                logger.LogWithColor($"[ItemGen] Could not patch stimulator buffs for '{itemName}' - globals structure not found.", LogTextColor.Yellow);
                 return;
             }
 
             List<Buff> buffs;
-            if (def.CustomBuffs.Count > 0)
+            if (customBuffs.Count > 0)
             {
-                buffs = def.CustomBuffs.Select(b => new Buff
+                buffs = customBuffs.Select(b => new Buff
                 {
                     BuffType = b.BuffType,
                     Chance = b.Chance,
@@ -194,7 +199,7 @@ public static class StimGenerator
                     SkillName = b.BuffType == "SkillRate" ? b.SkillName! : null!,
                 }).ToList();
             }
-            else if (!string.IsNullOrWhiteSpace(def.StimulatorBuffs) && TryGetExistingBuffs(stimulatorBuffs, def.StimulatorBuffs, out var existingBuffs))
+            else if (!string.IsNullOrWhiteSpace(stimulatorBuffsName) && TryGetExistingBuffs(stimulatorBuffs, stimulatorBuffsName, out var existingBuffs))
             {
                 buffs = existingBuffs;
             }
@@ -206,20 +211,23 @@ public static class StimGenerator
             SetDictionaryValue(stimulatorBuffs, buffSetKey, buffs);
 
             var items = databaseService.GetItems();
-            if (items.TryGetValue(def.Id, out var tpl))
+            if (items.TryGetValue(itemId, out var tpl))
             {
                 tpl.Properties ??= new TemplateItemProperties();
                 tpl.Properties.StimulatorBuffs = buffSetKey;
-                tpl.Properties.EffectsHealth = null;
-                tpl.Properties.EffectsDamage = null;
-                tpl.Properties.BodyPartPriority = null;
-                tpl.Properties.FoodEffectType = null;
+                if (clearEffects)
+                {
+                    tpl.Properties.EffectsHealth = null;
+                    tpl.Properties.EffectsDamage = null;
+                    tpl.Properties.BodyPartPriority = null;
+                    tpl.Properties.FoodEffectType = null;
+                }
             }
 
         }
         catch (Exception ex)
         {
-            logger.LogWithColor($"[ItemGen] Failed to patch stimulator buffs for '{def.Name}': {ex.Message}", LogTextColor.Yellow);
+            logger.LogWithColor($"[ItemGen] Failed to patch stimulator buffs for '{itemName}': {ex.Message}", LogTextColor.Yellow);
         }
     }
 

@@ -19,7 +19,7 @@ public record ModMetadata : AbstractModMetadata
     public override string Name { get; init; } = "ItemGen";
     public override string Author { get; init; } = "Serenity";
     public override List<string>? Contributors { get; init; }
-    public override SemanticVersioning.Version Version { get; init; } = new("1.3.5");
+    public override SemanticVersioning.Version Version { get; init; } = new("1.4.0");
     public override SemanticVersioning.Range SptVersion { get; init; } = new("4.0.13");
     public override List<string>? Incompatibilities { get; init; }
     public override Dictionary<string, SemanticVersioning.Range>? ModDependencies { get; init; }
@@ -76,12 +76,15 @@ public class ItemGenPlugin(
             var enabledStims = stimDefinitions.Where(d => d.Enabled).ToList();
             var medkitDefinitions = packs.SelectMany(p => p.Definition.Medkits).ToList();
             var enabledMedkits = medkitDefinitions.Where(d => d.Enabled).ToList();
+            var foodDrinkDefinitions = packs.SelectMany(p => p.Definition.FoodDrinks).ToList();
+            var enabledFoodDrinks = foodDrinkDefinitions.Where(d => d.Enabled).ToList();
 
             logger.LogWithColor($"[ItemGen] Loaded {questDefinitions.Count} quest item definition(s), {enabledQuestItems.Count} enabled.", LogTextColor.Cyan);
             logger.LogWithColor($"[ItemGen] Loaded {keyDefinitions.Count} key definition(s), {enabledKeys.Count} enabled.", LogTextColor.Cyan);
             logger.LogWithColor($"[ItemGen] Loaded {containerDefinitions.Count} container definition(s), {enabledContainers.Count} enabled.", LogTextColor.Cyan);
             logger.LogWithColor($"[ItemGen] Loaded {stimDefinitions.Count} stim definition(s), {enabledStims.Count} enabled.", LogTextColor.Cyan);
             logger.LogWithColor($"[ItemGen] Loaded {medkitDefinitions.Count} medkit definition(s), {enabledMedkits.Count} enabled.", LogTextColor.Cyan);
+            logger.LogWithColor($"[ItemGen] Loaded {foodDrinkDefinitions.Count} food/drink definition(s), {enabledFoodDrinks.Count} enabled.", LogTextColor.Cyan);
 
             // Register custom quest inventory items
             var registeredQuestItems = QuestInventoryItemGenerator.RegisterAll(customItemService, databaseService, enabledQuestItems, logger);
@@ -101,6 +104,9 @@ public class ItemGenPlugin(
             // Register custom medkits
             var registeredMedkits = MedKitGenerator.RegisterAll(customItemService, databaseService, enabledMedkits, logger);
 
+            // Register custom food and drink
+            var registeredFoodDrinks = FoodDrinkGenerator.RegisterAll(customItemService, databaseService, enabledFoodDrinks, logger);
+
             // Add custom items to trader assorts
             var traderEntries = TraderGenerator.RegisterAll(databaseService, packs.Select(p => p.Definition), logger);
 
@@ -111,13 +117,14 @@ public class ItemGenPlugin(
             enabledItems.AddRange(enabledContainers);
             enabledItems.AddRange(enabledStims);
             enabledItems.AddRange(enabledMedkits);
+            enabledItems.AddRange(enabledFoodDrinks);
             var lootInjections = LootInjector.InjectAll(databaseService, enabledItems, logger, config.Debug);
 
             // Add hideout workbench crafting recipes
             var craftingRecipes = CraftingManager.RegisterAll(databaseService, enabledItems, logger);
 
             logger.LogWithColor("[ItemGen] ====================================", LogTextColor.Cyan);
-            logger.LogWithColor($"[ItemGen] Done! Registered {registeredQuestItems}/{enabledQuestItems.Count} custom quest item(s), {registeredKeys}/{enabledKeys.Count} custom key(s), {registeredContainers}/{enabledContainers.Count} custom container(s), {registeredStims}/{enabledStims.Count} custom stim(s), {registeredMedkits}/{enabledMedkits.Count} custom medkit(s), {traderEntries} trader entry/entries, {lootInjections} loot injection(s), and {craftingRecipes} crafting recipe(s).", LogTextColor.Green);
+            logger.LogWithColor($"[ItemGen] Done! Registered {registeredQuestItems}/{enabledQuestItems.Count} custom quest item(s), {registeredKeys}/{enabledKeys.Count} custom key(s), {registeredContainers}/{enabledContainers.Count} custom container(s), {registeredStims}/{enabledStims.Count} custom stim(s), {registeredMedkits}/{enabledMedkits.Count} custom medkit(s), {registeredFoodDrinks}/{enabledFoodDrinks.Count} custom food/drink(s), {traderEntries} trader entry/entries, {lootInjections} loot injection(s), and {craftingRecipes} crafting recipe(s).", LogTextColor.Green);
             logger.LogWithColor("[ItemGen] ====================================", LogTextColor.Cyan);
         }
         catch (Exception ex)

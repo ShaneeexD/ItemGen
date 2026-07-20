@@ -23,7 +23,7 @@ namespace ItemGen.Client
         private static readonly HashSet<string> _customItemIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         private static readonly HashSet<string> _itemListKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
         {
-            "questItems", "keys", "containers", "stims", "medkits"
+            "questItems", "keys", "containers", "stims", "medkits", "foodDrinks"
         };
         private static ManualLogSource _log;
 

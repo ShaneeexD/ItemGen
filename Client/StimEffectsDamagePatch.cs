@@ -60,11 +60,6 @@ namespace ItemGen.Client
                 return;
             }
 
-            if (!(item is MedsItemClass))
-            {
-                return;
-            }
-
             if (!BundleInjector.IsCustomItem(item.StringTemplateId))
             {
                 return;

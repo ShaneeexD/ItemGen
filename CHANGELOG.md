@@ -1,5 +1,8 @@
 # Changelog
 
+## v1.4.0
+- **Custom Food and Drink items** - a new `foodDrinks` category lets you create one-use snacks or multi-use food/drink items with configurable `maxResource`/`resource`, `foodUseTime`, `foodEffectType`, health effects (Hydration/Energy), and damage effects. Full WebTool editor, validation, loot injection, and crafting support included.
+
 ## v1.3.6
 - **Fixed vanilla stims and meds** - the `StimEffectsDamagePatch` no longer runs on vanilla items, so default stims and other misc items can be used in raid again.
 - **Stim-only guard** - the `StimEffectsDamagePatch` and `StimEffectsDamageMultiPatch` now explicitly exit for medkits/non-stim meds, and the multi-patch is gated to custom items only, so modded healing items will not be affected.
