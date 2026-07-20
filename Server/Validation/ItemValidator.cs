@@ -20,8 +20,9 @@ public static class ItemValidator
         var stimList = pack.Stims ?? [];
         var medkitList = pack.Medkits ?? [];
         var foodDrinkList = pack.FoodDrinks ?? [];
+        var barterList = pack.Barters ?? [];
 
-        if (questList.Count == 0 && keyList.Count == 0 && containerList.Count == 0 && stimList.Count == 0 && medkitList.Count == 0 && foodDrinkList.Count == 0)
+        if (questList.Count == 0 && keyList.Count == 0 && containerList.Count == 0 && stimList.Count == 0 && medkitList.Count == 0 && foodDrinkList.Count == 0 && barterList.Count == 0)
         {
             errors.Add($"Pack '{fileName}': at least one item entry is required.");
             return errors;
@@ -177,6 +178,31 @@ public static class ItemValidator
 
             if (food.Height < 1)
                 errors.Add($"{prefix}: 'height' must be at least 1.");
+        }
+
+        for (var i = 0; i < barterList.Count; i++)
+        {
+            var barter = barterList[i];
+            var prefix = $"Barter[{i}]";
+            ValidateItem(barter, prefix, errors, seenIds);
+
+            if (barter.Weight < 0)
+                errors.Add($"{prefix}: 'weight' cannot be negative.");
+
+            if (barter.StackMaxSize < 1)
+                errors.Add($"{prefix}: 'stackMaxSize' must be at least 1.");
+
+            if (barter.Width < 1)
+                errors.Add($"{prefix}: 'width' must be at least 1.");
+
+            if (barter.Height < 1)
+                errors.Add($"{prefix}: 'height' must be at least 1.");
+
+            if (string.IsNullOrWhiteSpace(barter.Parent))
+                errors.Add($"{prefix}: 'parent' is required.");
+
+            if (string.IsNullOrWhiteSpace(barter.HandbookParentId))
+                errors.Add($"{prefix}: 'handbookParentId' is required.");
         }
 
         var traderList = pack.Traders ?? [];

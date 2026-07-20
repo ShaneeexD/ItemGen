@@ -78,6 +78,8 @@ public class ItemGenPlugin(
             var enabledMedkits = medkitDefinitions.Where(d => d.Enabled).ToList();
             var foodDrinkDefinitions = packs.SelectMany(p => p.Definition.FoodDrinks).ToList();
             var enabledFoodDrinks = foodDrinkDefinitions.Where(d => d.Enabled).ToList();
+            var barterDefinitions = packs.SelectMany(p => p.Definition.Barters).ToList();
+            var enabledBarters = barterDefinitions.Where(d => d.Enabled).ToList();
 
             logger.LogWithColor($"[ItemGen] Loaded {questDefinitions.Count} quest item definition(s), {enabledQuestItems.Count} enabled.", LogTextColor.Cyan);
             logger.LogWithColor($"[ItemGen] Loaded {keyDefinitions.Count} key definition(s), {enabledKeys.Count} enabled.", LogTextColor.Cyan);
@@ -85,6 +87,7 @@ public class ItemGenPlugin(
             logger.LogWithColor($"[ItemGen] Loaded {stimDefinitions.Count} stim definition(s), {enabledStims.Count} enabled.", LogTextColor.Cyan);
             logger.LogWithColor($"[ItemGen] Loaded {medkitDefinitions.Count} medkit definition(s), {enabledMedkits.Count} enabled.", LogTextColor.Cyan);
             logger.LogWithColor($"[ItemGen] Loaded {foodDrinkDefinitions.Count} food/drink definition(s), {enabledFoodDrinks.Count} enabled.", LogTextColor.Cyan);
+            logger.LogWithColor($"[ItemGen] Loaded {barterDefinitions.Count} barter item definition(s), {enabledBarters.Count} enabled.", LogTextColor.Cyan);
 
             // Register custom quest inventory items
             var registeredQuestItems = QuestInventoryItemGenerator.RegisterAll(customItemService, databaseService, enabledQuestItems, logger);
@@ -107,6 +110,9 @@ public class ItemGenPlugin(
             // Register custom food and drink
             var registeredFoodDrinks = FoodDrinkGenerator.RegisterAll(customItemService, databaseService, enabledFoodDrinks, logger);
 
+            // Register custom barter items
+            var registeredBarters = BarterGenerator.RegisterAll(customItemService, databaseService, enabledBarters, logger);
+
             // Add custom items to trader assorts
             var traderEntries = TraderGenerator.RegisterAll(databaseService, packs.Select(p => p.Definition), logger);
 
@@ -118,13 +124,14 @@ public class ItemGenPlugin(
             enabledItems.AddRange(enabledStims);
             enabledItems.AddRange(enabledMedkits);
             enabledItems.AddRange(enabledFoodDrinks);
+            enabledItems.AddRange(enabledBarters);
             var lootInjections = LootInjector.InjectAll(databaseService, enabledItems, logger, config.Debug);
 
             // Add hideout workbench crafting recipes
             var craftingRecipes = CraftingManager.RegisterAll(databaseService, enabledItems, logger);
 
             logger.LogWithColor("[ItemGen] ====================================", LogTextColor.Cyan);
-            logger.LogWithColor($"[ItemGen] Done! Registered {registeredQuestItems}/{enabledQuestItems.Count} custom quest item(s), {registeredKeys}/{enabledKeys.Count} custom key(s), {registeredContainers}/{enabledContainers.Count} custom container(s), {registeredStims}/{enabledStims.Count} custom stim(s), {registeredMedkits}/{enabledMedkits.Count} custom medkit(s), {registeredFoodDrinks}/{enabledFoodDrinks.Count} custom food/drink(s), {traderEntries} trader entry/entries, {lootInjections} loot injection(s), and {craftingRecipes} crafting recipe(s).", LogTextColor.Green);
+            logger.LogWithColor($"[ItemGen] Done! Registered {registeredQuestItems}/{enabledQuestItems.Count} custom quest item(s), {registeredKeys}/{enabledKeys.Count} custom key(s), {registeredContainers}/{enabledContainers.Count} custom container(s), {registeredStims}/{enabledStims.Count} custom stim(s), {registeredMedkits}/{enabledMedkits.Count} custom medkit(s), {registeredFoodDrinks}/{enabledFoodDrinks.Count} custom food/drink(s), {registeredBarters}/{enabledBarters.Count} custom barter item(s), {traderEntries} trader entry/entries, {lootInjections} loot injection(s), and {craftingRecipes} crafting recipe(s).", LogTextColor.Green);
             logger.LogWithColor("[ItemGen] ====================================", LogTextColor.Cyan);
         }
         catch (Exception ex)

@@ -43,6 +43,7 @@ import {
   StimDefinition,
   MedKitDefinition,
   FoodDrinkDefinition,
+  BarterDefinition,
   LootEntry,
   CraftingEntry,
   EffectsHealthProperties,
@@ -58,6 +59,7 @@ import {
   createDefaultStimBuff,
   createDefaultMedkit,
   createDefaultFoodDrink,
+  createDefaultBarter,
   createDefaultTraderEntry,
   createDefaultLootEntry,
   createDefaultCraftingEntry,
@@ -73,13 +75,14 @@ import { SECURE_CONTAINER_TEMPLATES } from './generated_secure_container_templat
 import { STIM_TEMPLATES } from './generated_stim_templates'
 import { MEDKIT_TEMPLATES } from './generated_medkit_templates'
 import { FOOD_DRINK_TEMPLATES, KNOWN_FOOD_DRINK_BUFFS } from './generated_food_drink_templates'
+import { BARTER_TEMPLATES } from './generated_barter_templates'
 import { LOOT_CONTAINERS, getLootContainer } from './generated_loot_containers'
 import apiItemNames from '../api_item_names.json'
 import { VanillaBundlesPanel } from './VanillaBundlesPanel'
 
 const ALL_CONTAINER_TEMPLATES = [...CONTAINER_TEMPLATES, ...SECURE_CONTAINER_TEMPLATES]
 
-type Tab = 'quest' | 'key' | 'container' | 'stim' | 'medkit' | 'fooddrink'
+type Tab = 'quest' | 'key' | 'container' | 'stim' | 'medkit' | 'fooddrink' | 'barter'
 type Mode = 'items' | 'traders' | 'bundles' | 'vanilla-bundles'
 type RightPanel = 'editor' | 'json'
 
@@ -169,7 +172,7 @@ function validatePack(pack: ItemPackDefinition): ValidationError[] {
   const errors: ValidationError[] = []
   if (!pack.name.trim()) errors.push({ field: 'name', message: 'Pack name is required.' })
 
-  if (pack.questItems.length === 0 && pack.keys.length === 0 && pack.containers.length === 0 && pack.stims.length === 0 && pack.medkits.length === 0 && pack.foodDrinks.length === 0) {
+  if (pack.questItems.length === 0 && pack.keys.length === 0 && pack.containers.length === 0 && pack.stims.length === 0 && pack.medkits.length === 0 && pack.foodDrinks.length === 0 && pack.barters.length === 0) {
     errors.push({ field: 'items', message: 'At least one item entry is required.' })
   }
 
@@ -181,6 +184,7 @@ function validatePack(pack: ItemPackDefinition): ValidationError[] {
     ...pack.stims.map(s => s.id),
     ...pack.medkits.map(m => m.id),
     ...pack.foodDrinks.map(f => f.id),
+    ...pack.barters.map(b => b.id),
   ])
 
   pack.questItems.forEach((item, i) => {
@@ -313,6 +317,27 @@ function validatePack(pack: ItemPackDefinition): ValidationError[] {
     validateCrafting(food.crafting, prefix, errors)
   })
 
+  pack.barters.forEach((barter, i) => {
+    const prefix = `barters[${i}]`
+    if (!HEX24.test(barter.id)) errors.push({ field: `${prefix}.id`, message: 'Barter ID must be 24 hex characters.' })
+    if (seenIds.has(barter.id.toLowerCase())) errors.push({ field: `${prefix}.id`, message: 'Duplicate ID.' })
+    else seenIds.add(barter.id.toLowerCase())
+    if (!HEX24.test(barter.baseTpl)) errors.push({ field: `${prefix}.baseTpl`, message: 'Base template must be 24 hex characters.' })
+    if (!barter.name.trim()) errors.push({ field: `${prefix}.name`, message: 'Name is required.' })
+    if (!barter.shortName.trim()) errors.push({ field: `${prefix}.shortName`, message: 'Short name is required.' })
+    if (!barter.description.trim()) errors.push({ field: `${prefix}.description`, message: 'Description is required.' })
+    if (barter.weight < 0) errors.push({ field: `${prefix}.weight`, message: 'Weight cannot be negative.' })
+    if (barter.stackMaxSize < 1) errors.push({ field: `${prefix}.stackMaxSize`, message: 'Stack max size must be at least 1.' })
+    if (barter.width < 1) errors.push({ field: `${prefix}.width`, message: 'Width must be at least 1.' })
+    if (barter.height < 1) errors.push({ field: `${prefix}.height`, message: 'Height must be at least 1.' })
+    if (barter.loot?.enabled) {
+      barter.loot.containerIds.forEach((id, j) => {
+        if (!HEX24.test(id)) errors.push({ field: `${prefix}.loot.containerIds[${j}]`, message: 'Container ID must be 24 hex characters.' })
+      })
+    }
+    validateCrafting(barter.crafting, prefix, errors)
+  })
+
   pack.traders.forEach((trader, ti) => {
     const tPrefix = `traders[${ti}]`
     if (!HEX24.test(trader.traderId)) errors.push({ field: `${tPrefix}.traderId`, message: 'Trader ID must be 24 hex characters.' })
@@ -402,6 +427,10 @@ function buildExportJson(pack: ItemPackDefinition): string {
     foodDrinks: pack.foodDrinks.map(f => ({
       ...f,
       properties: sanitizeProperties(f.properties || {}),
+    })),
+    barters: pack.barters.map(b => ({
+      ...b,
+      properties: sanitizeProperties(b.properties || {}),
     })),
   }
   return JSON.stringify(cleaned, null, 2)
@@ -782,6 +811,7 @@ export default function App() {
   const [selectedStimIndex, setSelectedStimIndex] = useState(0)
   const [selectedMedkitIndex, setSelectedMedkitIndex] = useState(0)
   const [selectedFoodDrinkIndex, setSelectedFoodDrinkIndex] = useState(0)
+  const [selectedBarterIndex, setSelectedBarterIndex] = useState(0)
   const [selectedTraderIndex, setSelectedTraderIndex] = useState(0)
   const [rightPanel, setRightPanel] = useState<RightPanel>('editor')
   const [copyFeedback, setCopyFeedback] = useState<string | null>(null)
@@ -796,9 +826,10 @@ export default function App() {
     if (tab === 'stim') return pack.stims
     if (tab === 'medkit') return pack.medkits
     if (tab === 'fooddrink') return pack.foodDrinks
+    if (tab === 'barter') return pack.barters
     return pack.containers
   }, [tab, pack])
-  const selectedIndex = tab === 'quest' ? selectedQuestIndex : tab === 'key' ? selectedKeyIndex : tab === 'stim' ? selectedStimIndex : tab === 'medkit' ? selectedMedkitIndex : tab === 'fooddrink' ? selectedFoodDrinkIndex : selectedContainerIndex
+  const selectedIndex = tab === 'quest' ? selectedQuestIndex : tab === 'key' ? selectedKeyIndex : tab === 'stim' ? selectedStimIndex : tab === 'medkit' ? selectedMedkitIndex : tab === 'fooddrink' ? selectedFoodDrinkIndex : tab === 'barter' ? selectedBarterIndex : selectedContainerIndex
   const selectedItem = activeItems[selectedIndex]
   const validationErrors = useMemo(() => validatePack(pack), [pack])
 
@@ -806,7 +837,7 @@ export default function App() {
     setPack(next)
   }, [])
 
-  const updateItem = useCallback((index: number, updates: Partial<QuestItemDefinition> | Partial<KeyDefinition> | Partial<ContainerDefinition> | Partial<StimDefinition> | Partial<MedKitDefinition> | Partial<FoodDrinkDefinition>) => {
+  const updateItem = useCallback((index: number, updates: Partial<QuestItemDefinition> | Partial<KeyDefinition> | Partial<ContainerDefinition> | Partial<StimDefinition> | Partial<MedKitDefinition> | Partial<FoodDrinkDefinition> | Partial<BarterDefinition>) => {
     const next = { ...pack }
     let oldId: string | null = null
     let newId: string | null = null
@@ -830,6 +861,10 @@ export default function App() {
       oldId = next.foodDrinks[index]?.id ?? null
       next.foodDrinks = next.foodDrinks.map((item, i) => (i === index ? { ...item, ...updates } as FoodDrinkDefinition : item))
       newId = next.foodDrinks[index]?.id ?? null
+    } else if (tab === 'barter') {
+      oldId = next.barters[index]?.id ?? null
+      next.barters = next.barters.map((item, i) => (i === index ? { ...item, ...updates } as BarterDefinition : item))
+      newId = next.barters[index]?.id ?? null
     } else {
       oldId = next.containers[index]?.id ?? null
       next.containers = next.containers.map((item, i) => (i === index ? { ...item, ...updates } as ContainerDefinition : item))
@@ -861,6 +896,9 @@ export default function App() {
     } else if (tab === 'fooddrink') {
       next.foodDrinks = [...next.foodDrinks, createDefaultFoodDrink()]
       setSelectedFoodDrinkIndex(next.foodDrinks.length - 1)
+    } else if (tab === 'barter') {
+      next.barters = [...next.barters, createDefaultBarter()]
+      setSelectedBarterIndex(next.barters.length - 1)
     } else {
       next.containers = [...next.containers, createDefaultContainer()]
       setSelectedContainerIndex(next.containers.length - 1)
@@ -885,12 +923,15 @@ export default function App() {
     } else if (tab === 'fooddrink') {
       next.foodDrinks = next.foodDrinks.filter((_, i) => i !== index)
       setSelectedFoodDrinkIndex(Math.max(0, Math.min(selectedFoodDrinkIndex, next.foodDrinks.length - 1)))
+    } else if (tab === 'barter') {
+      next.barters = next.barters.filter((_, i) => i !== index)
+      setSelectedBarterIndex(Math.max(0, Math.min(selectedBarterIndex, next.barters.length - 1)))
     } else {
       next.containers = next.containers.filter((_, i) => i !== index)
       setSelectedContainerIndex(Math.max(0, Math.min(selectedContainerIndex, next.containers.length - 1)))
     }
     updatePack(next)
-  }, [pack, selectedContainerIndex, selectedKeyIndex, selectedFoodDrinkIndex, selectedMedkitIndex, selectedQuestIndex, selectedStimIndex, updatePack])
+  }, [pack, selectedContainerIndex, selectedKeyIndex, selectedFoodDrinkIndex, selectedBarterIndex, selectedMedkitIndex, selectedQuestIndex, selectedStimIndex, updatePack])
 
   const moveItem = useCallback((index: number, dir: -1 | 1) => {
     const next = { ...pack }
@@ -930,6 +971,13 @@ export default function App() {
       list.splice(newIndex, 0, moved)
       next.foodDrinks = list
       setSelectedFoodDrinkIndex(newIndex)
+    } else if (tab === 'barter') {
+      const list = [...next.barters]
+      if (newIndex < 0 || newIndex >= list.length) return
+      const [moved] = list.splice(index, 1)
+      list.splice(newIndex, 0, moved)
+      next.barters = list
+      setSelectedBarterIndex(newIndex)
     } else {
       const list = [...next.containers]
       if (newIndex < 0 || newIndex >= list.length) return
@@ -1009,18 +1057,24 @@ export default function App() {
           loot: f.loot ?? createDefaultLootEntry(),
           crafting: f.crafting ?? createDefaultCraftingEntry(),
         })),
+        barters: (imported.barters || []).map(b => ({
+          ...b,
+          loot: b.loot ?? createDefaultLootEntry(),
+          crafting: b.crafting ?? createDefaultCraftingEntry(),
+        })),
         traders: imported.traders?.length
           ? imported.traders
           : VANILLA_TRADERS.map(t => ({ traderId: t.id, enabled: true, entries: [] })),
         bundles: importedBundles.length > 0 ? importedBundles : imported.bundles || [],
       }
       updatePack(normalized)
-      setTab(normalized.questItems.length > 0 ? 'quest' : normalized.keys.length > 0 ? 'key' : normalized.stims.length > 0 ? 'stim' : normalized.medkits.length > 0 ? 'medkit' : normalized.foodDrinks.length > 0 ? 'fooddrink' : 'container')
+      setTab(normalized.questItems.length > 0 ? 'quest' : normalized.keys.length > 0 ? 'key' : normalized.stims.length > 0 ? 'stim' : normalized.medkits.length > 0 ? 'medkit' : normalized.foodDrinks.length > 0 ? 'fooddrink' : normalized.barters.length > 0 ? 'barter' : 'container')
       setSelectedQuestIndex(0)
       setSelectedKeyIndex(0)
       setSelectedContainerIndex(0)
       setSelectedMedkitIndex(0)
       setSelectedFoodDrinkIndex(0)
+      setSelectedBarterIndex(0)
     } catch (e) {
       alert('Invalid pack file: ' + (e as Error).message)
     }
@@ -1154,6 +1208,23 @@ export default function App() {
         effectsDamage: template?.effectsDamage ?? {},
         properties: props,
       } as Partial<FoodDrinkDefinition>)
+    } else if (tab === 'barter') {
+      const template = BARTER_TEMPLATES.find(t => t.id === templateId)
+      const props = template?.properties ?? {}
+      updateItem(selectedIndex, {
+        ...baseUpdates,
+        weight: template?.weight ?? (typeof props.Weight === 'number' ? props.Weight : 0.1),
+        backgroundColor: template?.backgroundColor ?? props.BackgroundColor,
+        rarityPvE: template?.rarityPvE ?? props.RarityPvE ?? 'Common',
+        canSellOnRagfair: template?.canSellOnRagfair ?? props.CanSellOnRagfair ?? true,
+        itemSound: template?.itemSound ?? props.ItemSound ?? 'generic',
+        parent: template?.parent ?? props._parent ?? '5448eb774bdc2d0a728b4567',
+        handbookParentId: template?.handbookParentId ?? '5b47574386f77428ca22b33e',
+        stackMaxSize: template?.stackMaxSize ?? (typeof props.StackMaxSize === 'number' ? props.StackMaxSize : 1),
+        width: template?.width ?? (typeof props.Width === 'number' ? props.Width : 1),
+        height: template?.height ?? (typeof props.Height === 'number' ? props.Height : 1),
+        properties: props,
+      } as Partial<BarterDefinition>)
     } else {
       const template = ALL_CONTAINER_TEMPLATES.find(t => t.id === templateId)
       const props = template?.properties ?? {}
@@ -1265,16 +1336,17 @@ export default function App() {
                     <option value="stim">Stims ({pack.stims.length})</option>
                     <option value="medkit">MedKits ({pack.medkits.length})</option>
                     <option value="fooddrink">Food/Drink ({pack.foodDrinks.length})</option>
+                    <option value="barter">Barter ({pack.barters.length})</option>
                   </select>
                 </Field>
                 <button className="btn-primary w-full text-sm flex items-center justify-center gap-1.5" onClick={addItem}>
-                  <Plus size={14} /> Add {tab === 'quest' ? 'Quest Item' : tab === 'key' ? 'Key' : tab === 'stim' ? 'Stim' : tab === 'medkit' ? 'MedKit' : tab === 'fooddrink' ? 'Food/Drink' : 'Container'}
+                  <Plus size={14} /> Add {tab === 'quest' ? 'Quest Item' : tab === 'key' ? 'Key' : tab === 'stim' ? 'Stim' : tab === 'medkit' ? 'MedKit' : tab === 'fooddrink' ? 'Food/Drink' : tab === 'barter' ? 'Barter' : 'Container'}
                 </button>
               </div>
 
               <div ref={listRef} className="flex-1 overflow-y-auto p-2 space-y-2">
                 {activeItems.map((item, i) => {
-                  const listPrefix = tab === 'quest' ? 'questItems' : tab === 'key' ? 'keys' : tab === 'stim' ? 'stims' : tab === 'medkit' ? 'medkits' : tab === 'fooddrink' ? 'foodDrinks' : 'containers'
+                  const listPrefix = tab === 'quest' ? 'questItems' : tab === 'key' ? 'keys' : tab === 'stim' ? 'stims' : tab === 'medkit' ? 'medkits' : tab === 'fooddrink' ? 'foodDrinks' : tab === 'barter' ? 'barters' : 'containers'
                   const hasErrors = validationErrors.some(e => e.field.startsWith(`${listPrefix}[${i}]`))
                   return (
                     <div
@@ -1290,6 +1362,7 @@ export default function App() {
                         else if (tab === 'stim') setSelectedStimIndex(i)
                         else if (tab === 'medkit') setSelectedMedkitIndex(i)
                         else if (tab === 'fooddrink') setSelectedFoodDrinkIndex(i)
+                        else if (tab === 'barter') setSelectedBarterIndex(i)
                         else setSelectedContainerIndex(i)
                       }}
                     >
@@ -1303,13 +1376,13 @@ export default function App() {
                   )
                 })}
                 {activeItems.length === 0 && (
-                  <div className="text-sm text-tarkov-text-dim text-center py-4">No {tab === 'quest' ? 'quest items' : tab === 'key' ? 'keys' : tab === 'stim' ? 'stims' : tab === 'medkit' ? 'medkits' : tab === 'fooddrink' ? 'food/drink items' : 'containers'} yet.</div>
+                  <div className="text-sm text-tarkov-text-dim text-center py-4">No {tab === 'quest' ? 'quest items' : tab === 'key' ? 'keys' : tab === 'stim' ? 'stims' : tab === 'medkit' ? 'medkits' : tab === 'fooddrink' ? 'food/drink items' : tab === 'barter' ? 'barter items' : 'containers'} yet.</div>
                 )}
               </div>
 
               <div className="p-3 border-t border-tarkov-border space-y-2">
                 <button className="btn-primary w-full text-sm flex items-center justify-center gap-1.5" onClick={addItem}>
-                  <Plus size={14} /> Add {tab === 'quest' ? 'Quest Item' : tab === 'key' ? 'Key' : tab === 'stim' ? 'Stim' : tab === 'medkit' ? 'MedKit' : tab === 'fooddrink' ? 'Food/Drink' : 'Container'}
+                  <Plus size={14} /> Add {tab === 'quest' ? 'Quest Item' : tab === 'key' ? 'Key' : tab === 'stim' ? 'Stim' : tab === 'medkit' ? 'MedKit' : tab === 'fooddrink' ? 'Food/Drink' : tab === 'barter' ? 'Barter' : 'Container'}
                 </button>
               </div>
             </>
@@ -1397,17 +1470,17 @@ export default function App() {
 
                 <Section title="Identity" icon={<Fingerprint size={18} />}>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <Field label="Item ID" tooltip="Unique 24-character hex ID for this custom item. Used by quests, traders, and other mods to reference it." error={errorsByField(`${tab === 'quest' ? 'questItems' : tab === 'key' ? 'keys' : tab === 'medkit' ? 'medkits' : tab === 'fooddrink' ? 'foodDrinks' : 'containers'}[${selectedIndex}].id`).length > 0}>
+                    <Field label="Item ID" tooltip="Unique 24-character hex ID for this custom item. Used by quests, traders, and other mods to reference it." error={errorsByField(`${tab === 'quest' ? 'questItems' : tab === 'key' ? 'keys' : tab === 'medkit' ? 'medkits' : tab === 'fooddrink' ? 'foodDrinks' : tab === 'barter' ? 'barters' : 'containers'}[${selectedIndex}].id`).length > 0}>
                       <div className="flex gap-2">
                         <input className="input-field flex-1 font-mono text-sm" value={selectedItem.id} onChange={e => updateItem(selectedIndex, { id: e.target.value })} maxLength={24} />
                         <button className="btn-secondary text-xs px-2" onClick={() => updateItem(selectedIndex, { id: generateMongoId() })} title="Regenerate ID">
                           <RefreshCw size={14} />
                         </button>
                       </div>
-                      <FieldErrors errors={errorsByField(`${tab === 'quest' ? 'questItems' : tab === 'key' ? 'keys' : tab === 'medkit' ? 'medkits' : tab === 'fooddrink' ? 'foodDrinks' : 'containers'}[${selectedIndex}].id`)} />
+                      <FieldErrors errors={errorsByField(`${tab === 'quest' ? 'questItems' : tab === 'key' ? 'keys' : tab === 'medkit' ? 'medkits' : tab === 'fooddrink' ? 'foodDrinks' : tab === 'barter' ? 'barters' : 'containers'}[${selectedIndex}].id`)} />
                     </Field>
 
-                    <Field label="Base Template" tooltip={`Vanilla item to clone. The new item inherits the parent category, handbook category, and model unless overridden. Search all SPT items below; keys, quest items, containers, stims, medkits, and food/drink items are included.`} error={errorsByField(`${tab === 'quest' ? 'questItems' : tab === 'key' ? 'keys' : tab === 'medkit' ? 'medkits' : tab === 'fooddrink' ? 'foodDrinks' : 'containers'}[${selectedIndex}].baseTpl`).length > 0}>
+                    <Field label="Base Template" tooltip={`Vanilla item to clone. The new item inherits the parent category, handbook category, and model unless overridden. Search all SPT items below; keys, quest items, containers, stims, medkits, and food/drink items are included.`} error={errorsByField(`${tab === 'quest' ? 'questItems' : tab === 'key' ? 'keys' : tab === 'medkit' ? 'medkits' : tab === 'fooddrink' ? 'foodDrinks' : tab === 'barter' ? 'barters' : 'containers'}[${selectedIndex}].baseTpl`).length > 0}>
                       <SearchableSelect
                         value={selectedItem.baseTpl}
                         onChange={id => selectTemplate(id)}
@@ -1419,7 +1492,7 @@ export default function App() {
                           {selectedItem.baseTpl} {getParentDisplay(selectedItem.baseTpl, tab)}
                         </div>
                       )}
-                      <FieldErrors errors={errorsByField(`${tab === 'quest' ? 'questItems' : tab === 'key' ? 'keys' : tab === 'medkit' ? 'medkits' : tab === 'fooddrink' ? 'foodDrinks' : 'containers'}[${selectedIndex}].baseTpl`)} />
+                      <FieldErrors errors={errorsByField(`${tab === 'quest' ? 'questItems' : tab === 'key' ? 'keys' : tab === 'medkit' ? 'medkits' : tab === 'fooddrink' ? 'foodDrinks' : tab === 'barter' ? 'barters' : 'containers'}[${selectedIndex}].baseTpl`)} />
                     </Field>
                   </div>
 
@@ -1536,10 +1609,17 @@ export default function App() {
                   />
                 )}
 
-                {'handbookParentId' in selectedItem && (
+                {'handbookParentId' in selectedItem && tab === 'container' && (
                   <ContainerSpecifics
                     container={selectedItem as ContainerDefinition}
                     onChange={updates => updateItem(selectedIndex, updates)}
+                  />
+                )}
+
+                {'stackMaxSize' in selectedItem && tab === 'barter' && (
+                  <BarterSpecifics
+                    barter={selectedItem as BarterDefinition}
+                    onChange={updates => updateItem(selectedIndex, updates as Partial<BarterDefinition>)}
                   />
                 )}
 
@@ -1657,6 +1737,10 @@ function getTemplateName(id: string, tab: Tab): string {
     const t = FOOD_DRINK_TEMPLATES.find(x => x.id === id)
     return t ? t.displayName : (getItemOrCategoryName(id) ?? '')
   }
+  if (tab === 'barter') {
+    const t = BARTER_TEMPLATES.find(x => x.id === id)
+    return t ? t.displayName : (getItemOrCategoryName(id) ?? '')
+  }
   const t = ALL_CONTAINER_TEMPLATES.find(x => x.id === id)
   return t ? t.displayName : ''
 }
@@ -1680,6 +1764,10 @@ function getTemplateParent(id: string, tab: Tab): string {
   }
   if (tab === 'fooddrink') {
     const t = FOOD_DRINK_TEMPLATES.find(x => x.id === id)
+    return t ? t.parent : ''
+  }
+  if (tab === 'barter') {
+    const t = BARTER_TEMPLATES.find(x => x.id === id)
     return t ? t.parent : ''
   }
   const t = ALL_CONTAINER_TEMPLATES.find(x => x.id === id)
@@ -1711,7 +1799,7 @@ function TraderEditor({ pack, traderIndex, onChange }: { pack: ItemPackDefinitio
   }
 
   const addEntry = () => {
-    const allItems = [...pack.questItems, ...pack.keys, ...pack.containers, ...pack.stims, ...pack.medkits, ...pack.foodDrinks]
+    const allItems = [...pack.questItems, ...pack.keys, ...pack.containers, ...pack.stims, ...pack.medkits, ...pack.foodDrinks, ...pack.barters]
     const itemId = allItems[0]?.id || ''
     updateTrader({ entries: [...trader.entries, createDefaultTraderEntry(itemId)] })
   }
@@ -1720,7 +1808,7 @@ function TraderEditor({ pack, traderIndex, onChange }: { pack: ItemPackDefinitio
     updateTrader({ entries: trader.entries.filter((_, i) => i !== index) })
   }
 
-  const allItems = [...pack.questItems, ...pack.keys, ...pack.containers, ...pack.stims, ...pack.medkits, ...pack.foodDrinks]
+  const allItems = [...pack.questItems, ...pack.keys, ...pack.containers, ...pack.stims, ...pack.medkits, ...pack.foodDrinks, ...pack.barters]
   const itemOptions = allItems.map(item => ({
     value: item.id,
     label: `${item.name} (${item.shortName})`,
@@ -2736,6 +2824,61 @@ interface SearchableSelectProps {
   onChange: (value: string) => void
   options: { value: string; label: string; sub?: string }[]
   placeholder?: string
+}
+
+interface BarterSpecificsProps {
+  barter: BarterDefinition
+  onChange: (updates: Partial<BarterDefinition>) => void
+}
+
+function BarterSpecifics({ barter, onChange }: BarterSpecificsProps) {
+  const props = barter.properties || {}
+
+  const updateProp = (key: string, value: any) => {
+    const next = { ...props, [key]: value }
+    onChange({ properties: next })
+  }
+
+  return (
+    <Section title="Barter Specifics" icon={<Package size={18} />}>
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <Field label="Parent Category" tooltip="EFT item parent ID. Defaults to BarterItem (5448eb774bdc2d0a728b4567).">
+          <input className="input-field font-mono" value={barter.parent} onChange={e => onChange({ parent: e.target.value })} />
+        </Field>
+        <Field label="Handbook Category" tooltip="EFT handbook category ID. Defaults to Barter Items (5b47574386f77428ca22b33e).">
+          <input className="input-field font-mono" value={barter.handbookParentId} onChange={e => onChange({ handbookParentId: e.target.value })} />
+        </Field>
+        <Field label="Item Sound" tooltip="Sound identifier used when moving the item.">
+          <input className="input-field" value={barter.itemSound} onChange={e => onChange({ itemSound: e.target.value })} />
+        </Field>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
+        <Field label="Stack Max Size" tooltip="Maximum number of items that can stack in one inventory slot.">
+          <input className="input-field" type="number" min={1} value={barter.stackMaxSize} onChange={e => onChange({ stackMaxSize: parseInt(e.target.value) || 1 })} />
+        </Field>
+        <Field label="Width" tooltip="Inventory cell width.">
+          <input className="input-field" type="number" min={1} value={barter.width} onChange={e => onChange({ width: parseInt(e.target.value) || 1 })} />
+        </Field>
+        <Field label="Height" tooltip="Inventory cell height.">
+          <input className="input-field" type="number" min={1} value={barter.height} onChange={e => onChange({ height: parseInt(e.target.value) || 1 })} />
+        </Field>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+        <Field label="Custom Model" tooltip="Custom bundle filename for the inventory model. Leave empty to inherit from the base template.">
+          <input className="input-field" value={props.Prefab?.path ?? ''} onChange={e => updateProp('Prefab', { ...props.Prefab, path: e.target.value })} placeholder="my_barter.bundle" />
+        </Field>
+        <Field label="Use Model" tooltip="Custom bundle filename for the in-hand/interaction model. Leave empty to inherit from the base template.">
+          <input className="input-field" value={props.UsePrefab?.path ?? ''} onChange={e => updateProp('UsePrefab', { ...props.UsePrefab, path: e.target.value })} placeholder="my_barter.bundle" />
+        </Field>
+      </div>
+
+      <div className="mt-4">
+        <RawPropertiesPanel properties={props} onChange={next => onChange({ properties: next })} />
+      </div>
+    </Section>
+  )
 }
 
 function SearchableSelect({ value, onChange, options, placeholder }: SearchableSelectProps) {

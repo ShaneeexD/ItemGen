@@ -31,6 +31,9 @@ public class ItemPackDefinition
     [JsonPropertyName("foodDrinks")]
     public List<FoodDrinkDefinition> FoodDrinks { get; set; } = [];
 
+    [JsonPropertyName("barters")]
+    public List<BarterDefinition> Barters { get; set; } = [];
+
     [JsonPropertyName("traders")]
     public List<TraderDefinition> Traders { get; set; } = [];
 }
@@ -186,6 +189,30 @@ public class FoodDrinkDefinition : ItemDefinition
 
     [JsonPropertyName("effectsDamage")]
     public Dictionary<string, EffectsDamageProperties>? EffectsDamage { get; set; }
+
+    [JsonPropertyName("properties")]
+    public JsonElement Properties { get; set; }
+}
+
+public class BarterDefinition : ItemDefinition
+{
+    [JsonPropertyName("parent")]
+    public string Parent { get; set; } = "5448eb774bdc2d0a728b4567";
+
+    [JsonPropertyName("handbookParentId")]
+    public string HandbookParentId { get; set; } = "5b47574386f77428ca22b33e";
+
+    [JsonPropertyName("stackMaxSize")]
+    public int StackMaxSize { get; set; } = 1;
+
+    [JsonPropertyName("width")]
+    public int Width { get; set; } = 1;
+
+    [JsonPropertyName("height")]
+    public int Height { get; set; } = 1;
+
+    [JsonPropertyName("itemSound")]
+    public string ItemSound { get; set; } = "generic";
 
     [JsonPropertyName("properties")]
     public JsonElement Properties { get; set; }
