@@ -65,6 +65,11 @@ namespace ItemGen.Client
                 return;
             }
 
+            if (!BundleInjector.IsCustomItem(item.StringTemplateId))
+            {
+                return;
+            }
+
             var healthEffects = GetItemComponent<HealthEffectsComponent>(item);
             if (healthEffects == null)
             {

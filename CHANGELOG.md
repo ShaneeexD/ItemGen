@@ -1,5 +1,8 @@
 # Changelog
 
+## v1.3.6
+- **Fixed vanilla stims and meds** - the `StimEffectsDamagePatch` no longer runs on vanilla items, so default stims and other misc items can be used in raid again.
+
 ## v1.3.5
 - **Container loot pool injection** - every item type can now be added to vanilla container loot tables. The new `Loot` section in the tool lets you enable loot injection, pick container IDs, and set rarity.
 - **Fixed client icon scaling** - fixed a bug where the item icon scaling would affect other items in the stash.
