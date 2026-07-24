@@ -130,6 +130,19 @@ public static class MedKitGenerator
                 {
                     tpl.Properties.UsePrefab.Path = customUsePrefabPath;
                 }
+
+                // Ensure effects are written to the cloned template's properties so the client
+                // picks them up (EffectsHealth/EffectsDamage dictionaries can be dropped by the
+                // clone override merge due to the SPT ArrayToObject converter).
+                if (overrides.EffectsHealth?.Count > 0)
+                {
+                    tpl.Properties.EffectsHealth = overrides.EffectsHealth;
+                }
+
+                if (overrides.EffectsDamage?.Count > 0)
+                {
+                    tpl.Properties.EffectsDamage = overrides.EffectsDamage;
+                }
             }
             else
             {
