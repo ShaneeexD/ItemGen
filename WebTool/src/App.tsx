@@ -198,6 +198,8 @@ function validatePack(pack: ItemPackDefinition): ValidationError[] {
     if (!item.description.trim()) errors.push({ field: `${prefix}.description`, message: 'Description is required.' })
     if (item.weight < 0) errors.push({ field: `${prefix}.weight`, message: 'Weight cannot be negative.' })
     if (item.stackMaxSize < 1) errors.push({ field: `${prefix}.stackMaxSize`, message: 'Stack max size must be >= 1.' })
+    if (item.width < 1) errors.push({ field: `${prefix}.width`, message: 'Width must be at least 1.' })
+    if (item.height < 1) errors.push({ field: `${prefix}.height`, message: 'Height must be at least 1.' })
     if (item.loot?.enabled) {
       item.loot.containerIds.forEach((id, j) => {
         if (!HEX24.test(id)) errors.push({ field: `${prefix}.loot.containerIds[${j}]`, message: 'Container ID must be 24 hex characters.' })
@@ -1117,13 +1119,16 @@ export default function App() {
     }
     if (tab === 'quest') {
       const template = QUEST_TEMPLATES.find(t => t.id === templateId)
+      const templateProps = template?.properties ?? {}
       updateItem(selectedIndex, {
         ...baseUpdates,
         ...(template ? {
           weight: template.weight,
           backgroundColor: template.backgroundColor,
           stackMaxSize: template.stackMaxSize,
-          properties: template.properties ?? {},
+          width: template.width,
+          height: template.height,
+          properties: { ...templateProps, Prefab: { ...(templateProps.Prefab ?? {}), path: template.prefab } },
         } : {}),
       })
     } else if (tab === 'key') {
@@ -1547,10 +1552,26 @@ export default function App() {
                       <Field label="Stack Max Size" tooltip="Maximum number of this item that can stack in one inventory cell.">
                         <input className="input-field" type="number" min={1} value={(selectedItem as QuestItemDefinition).stackMaxSize} onChange={e => updateItem(selectedIndex, { stackMaxSize: parseInt(e.target.value) || 1 })} />
                       </Field>
+                      <Field label="Width" tooltip="Inventory cell width. Affects stash size and icon scaling.">
+                        <input className="input-field" type="number" min={1} value={(selectedItem as QuestItemDefinition).width} onChange={e => updateItem(selectedIndex, { width: parseInt(e.target.value) || 1 })} />
+                      </Field>
+                      <Field label="Height" tooltip="Inventory cell height. Affects stash size and icon scaling.">
+                        <input className="input-field" type="number" min={1} value={(selectedItem as QuestItemDefinition).height} onChange={e => updateItem(selectedIndex, { height: parseInt(e.target.value) || 1 })} />
+                      </Field>
                     </div>
                     <Field label="Linked Quest IDs (optional)" tooltip="Comma-separated quest template IDs that use this item in a FindItem condition. Used by companion mods (e.g. TraderGen) to auto-generate quests." className="mt-4">
                       <input className="input-field" placeholder="e.g. 5936da9e86f7742d65037edf, ..." value={(selectedItem as QuestItemDefinition).questIds.join(', ')} onChange={e => updateItem(selectedIndex, { questIds: e.target.value.split(',').map(s => s.trim()) })} />
                     </Field>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+                      <Field label="Custom Model" tooltip="Custom bundle filename for the inventory model. Leave empty to inherit from the base template.">
+                        <input className="input-field" value={(selectedItem as QuestItemDefinition).properties.Prefab?.path ?? ''} onChange={e => updateItem(selectedIndex, { properties: { ...(selectedItem as QuestItemDefinition).properties, Prefab: { ...((selectedItem as QuestItemDefinition).properties.Prefab ?? {}), path: e.target.value } } })} placeholder="my_quest_item.bundle" />
+                      </Field>
+                      <Field label="Use Model" tooltip="Custom bundle filename for the in-hand/interaction model. Leave empty to inherit from the base template.">
+                        <input className="input-field" value={(selectedItem as QuestItemDefinition).properties.UsePrefab?.path ?? ''} onChange={e => updateItem(selectedIndex, { properties: { ...(selectedItem as QuestItemDefinition).properties, UsePrefab: { ...((selectedItem as QuestItemDefinition).properties.UsePrefab ?? {}), path: e.target.value } } })} placeholder="my_quest_item.bundle" />
+                      </Field>
+                    </div>
+
                     <div className="mt-3 text-sm text-tarkov-text-dim bg-tarkov-bg border border-tarkov-border rounded p-3">
                       <span className="text-tarkov-accent font-semibold">Note:</span> The server sets <span className="font-mono">QuestItem = true</span> on this item so it behaves exactly like a vanilla EFT quest inventory item.
                     </div>

@@ -6,6 +6,7 @@
 - **Fixed vanilla stims and meds** - the `StimEffectsDamagePatch` no longer runs on vanilla items, so default stims and other misc items can be used in raid again.
 - **Stim-only guard** - the `StimEffectsDamagePatch` and `StimEffectsDamageMultiPatch` now explicitly exit for non-stim meds, and the multi-patch is gated to custom items only, so other modded healing items will not be affected.
 - **Workbench crafting** - every custom item type can now have a hideout workbench craft recipe with requirements, workbench level, craft time, and output count. A new `Crafting` section in the tool lets you configure these recipes.
+- **Quest item model and sizing** - quest items now support `width`/`height` for stash size and icon scaling, plus `Custom Model` and `Use Model` fields in the WebTool for custom bundle paths.
 
 ## v1.3.5
 - **Container loot pool injection** - every item type can now be added to vanilla container loot tables. The new `Loot` section in the tool lets you enable loot injection, pick container IDs, and set rarity.

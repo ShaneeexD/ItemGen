@@ -42,6 +42,12 @@ public static class ItemValidator
             if (item.StackMaxSize < 1)
                 errors.Add($"{prefix}: 'stackMaxSize' must be >= 1.");
 
+            if (item.Width < 1)
+                errors.Add($"{prefix}: 'width' must be at least 1.");
+
+            if (item.Height < 1)
+                errors.Add($"{prefix}: 'height' must be at least 1.");
+
             if (item.HandbookPriceRoubles < 0)
                 errors.Add($"{prefix}: 'handbookPriceRoubles' cannot be negative.");
 

@@ -74,6 +74,8 @@ export function createDefaultCraftingEntry(): CraftingEntry {
 
 export interface QuestItemDefinition extends ItemDefinition {
   stackMaxSize: number
+  width: number
+  height: number
   questIds: string[]
   properties: Record<string, any>
 }
@@ -212,6 +214,8 @@ export function createDefaultQuestItem(): QuestItemDefinition {
     rarityPvE: 'Not_exist',
     canSellOnRagfair: false,
     stackMaxSize: 1,
+    width: 1,
+    height: 1,
     questIds: [],
     properties: {},
     loot: createDefaultLootEntry(),

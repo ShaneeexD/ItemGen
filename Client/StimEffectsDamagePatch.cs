@@ -84,6 +84,30 @@ namespace ItemGen.Client
                 return;
             }
 
+            // Only body-part-relevant damage effects need corrected targeting.
+            // Effects like Pain/Contusion have no associated body part, so the original
+            // method_7 result must be left untouched.
+            var relevantDamageEffects = new HashSet<EDamageEffectType>
+            {
+                EDamageEffectType.DestroyedPart,
+                EDamageEffectType.Fracture,
+                EDamageEffectType.HeavyBleeding,
+                EDamageEffectType.LightBleeding,
+            };
+            var hasRelevant = false;
+            foreach (var key in damageEffects.Keys)
+            {
+                if (relevantDamageEffects.Contains(key))
+                {
+                    hasRelevant = true;
+                    break;
+                }
+            }
+            if (!hasRelevant)
+            {
+                return;
+            }
+
             // If there are no stimulator buffs, the original code already falls through to
             // method_9 and finds the correct body part. Only patch when stim buffs would
             // otherwise force the effect onto Head.
@@ -100,8 +124,21 @@ namespace ItemGen.Client
             }
             else
             {
-                damagedBodyPart = null;
-                __result = false;
+                var allRelevant = true;
+                foreach (var key in damageEffects.Keys)
+                {
+                    if (!relevantDamageEffects.Contains(key))
+                    {
+                        allRelevant = false;
+                        break;
+                    }
+                }
+
+                if (allRelevant)
+                {
+                    damagedBodyPart = null;
+                    __result = false;
+                }
             }
         }
 

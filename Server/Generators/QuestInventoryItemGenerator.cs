@@ -69,9 +69,17 @@ public static class QuestInventoryItemGenerator
         overrides.Weight = def.Weight;
         overrides.BackgroundColor = string.IsNullOrWhiteSpace(def.BackgroundColor) ? null : def.BackgroundColor;
         overrides.StackMaxSize = def.StackMaxSize;
+        overrides.Width = def.Width;
+        overrides.Height = def.Height;
         overrides.QuestItem = true;
         overrides.CanSellOnRagfair = def.CanSellOnRagfair;
         overrides.RarityPvE = def.RarityPvE;
+
+        // Do not override the model via clone properties; custom bundle paths are injected after creation (see VPOAmmo pattern).
+        var customPrefabPath = GetPropertyPath(def.Properties, "Prefab");
+        var customUsePrefabPath = GetPropertyPath(def.Properties, "UsePrefab");
+        overrides.Prefab = null;
+        overrides.UsePrefab = null;
 
         var details = new NewItemFromCloneDetails
         {
@@ -97,6 +105,29 @@ public static class QuestInventoryItemGenerator
 
         if (result.Success == true)
         {
+            var items = databaseService.GetItems();
+            if (items.TryGetValue(def.Id, out var tpl) && tpl.Properties != null)
+            {
+                tpl.Properties.Width = def.Width;
+                tpl.Properties.Height = def.Height;
+
+                if (!string.IsNullOrWhiteSpace(customPrefabPath) && tpl.Properties.Prefab != null)
+                {
+                    tpl.Properties.Prefab.Path = customPrefabPath;
+                }
+
+                if (!string.IsNullOrWhiteSpace(customUsePrefabPath) && tpl.Properties.UsePrefab != null)
+                {
+                    tpl.Properties.UsePrefab.Path = customUsePrefabPath;
+                }
+            }
+            else
+            {
+                logger.LogWithColor(
+                    $"[ItemGen] Could not inject bundle path for quest item '{def.Name}' - item not found after clone.",
+                    LogTextColor.Yellow);
+            }
+
             ValidateLinkedQuests(def, databaseService, logger);
             return true;
         }
@@ -145,6 +176,24 @@ public static class QuestInventoryItemGenerator
                     LogTextColor.Yellow);
             }
         }
+    }
+
+    private static string? GetPropertyPath(JsonElement properties, string propertyName)
+    {
+        if (properties.ValueKind == JsonValueKind.Undefined || properties.ValueKind == JsonValueKind.Null)
+        {
+            return null;
+        }
+
+        if (properties.TryGetProperty(propertyName, out var prefab)
+            && prefab.ValueKind == JsonValueKind.Object
+            && prefab.TryGetProperty("path", out var path)
+            && path.ValueKind == JsonValueKind.String)
+        {
+            return path.GetString();
+        }
+
+        return null;
     }
 
     private static string ResolveParentId(DatabaseService databaseService, string baseTpl)

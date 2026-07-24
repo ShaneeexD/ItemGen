@@ -352,6 +352,12 @@ public class QuestItemDefinition : ItemDefinition
     [JsonPropertyName("stackMaxSize")]
     public int StackMaxSize { get; set; } = 1;
 
+    [JsonPropertyName("width")]
+    public int Width { get; set; } = 1;
+
+    [JsonPropertyName("height")]
+    public int Height { get; set; } = 1;
+
     [JsonPropertyName("questIds")]
     public List<string> QuestIds { get; set; } = [];
 
