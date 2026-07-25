@@ -117,6 +117,13 @@ public static class KeyGenerator
                 {
                     tpl.Properties.UsePrefab.Path = customUsePrefabPath;
                 }
+
+                // Ensure BackgroundColor is written to the cloned template's properties so the
+                // client picks it up (CreateItemFromClone may drop it during override merge).
+                if (!string.IsNullOrWhiteSpace(def.BackgroundColor))
+                {
+                    tpl.Properties.BackgroundColor = def.BackgroundColor;
+                }
             }
             else
             {
