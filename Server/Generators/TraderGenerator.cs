@@ -1,6 +1,7 @@
 using SPTarkov.Server.Core.Models.Common;
 using SPTarkov.Server.Core.Models.Eft.Common;
 using SPTarkov.Server.Core.Models.Eft.Common.Tables;
+using SPTarkov.Server.Core.Models.Enums;
 using SPTarkov.Server.Core.Models.Logging;
 using SPTarkov.Server.Core.Models.Spt.Mod;
 using SPTarkov.Server.Core.Models.Utils;
@@ -124,8 +125,43 @@ public static class TraderGenerator
         };
         assort.Items.Add(typedItem);
 
-        var barterEntry = new List<List<BarterScheme>>
+        assort.BarterScheme[itemTemplateId] = BuildBarterScheme(entry);
+        assort.LoyalLevelItems[itemTemplateId] = entry.LoyaltyLevel;
+
+        return true;
+    }
+
+    private static List<List<BarterScheme>> BuildBarterScheme(TraderItemEntry entry)
+    {
+        if (entry.Barter is { Count: > 0 })
         {
+            var schemeItems = new List<BarterScheme>();
+            foreach (var barter in entry.Barter)
+            {
+                var scheme = new BarterScheme
+                {
+                    Template = new MongoId(barter.ItemTpl),
+                    Count = barter.Count,
+                };
+
+                if (barter.Level.HasValue)
+                {
+                    scheme.Level = barter.Level.Value;
+                }
+
+                if (!string.IsNullOrEmpty(barter.Side))
+                {
+                    scheme.Side = Enum.Parse<DogtagExchangeSide>(barter.Side, true);
+                }
+
+                schemeItems.Add(scheme);
+            }
+
+            return [schemeItems];
+        }
+
+        return
+        [
             new List<BarterScheme>
             {
                 new BarterScheme
@@ -134,10 +170,6 @@ public static class TraderGenerator
                     Template = new MongoId(RoublesTpl),
                 }
             }
-        };
-        assort.BarterScheme[itemTemplateId] = barterEntry;
-        assort.LoyalLevelItems[itemTemplateId] = entry.LoyaltyLevel;
-
-        return true;
+        ];
     }
 }

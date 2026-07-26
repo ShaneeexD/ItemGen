@@ -169,6 +169,13 @@ export interface BarterDefinition extends ItemDefinition {
   properties: Record<string, any>
 }
 
+export interface BarterRequirement {
+  itemTpl: string
+  count: number
+  level?: number
+  side?: string
+}
+
 export interface TraderItemEntry {
   itemId: string
   enabled: boolean
@@ -178,6 +185,7 @@ export interface TraderItemEntry {
   buyRestrictionMax: number
   unlimitedStock: boolean
   unlimitedBuyRestriction: boolean
+  barter: BarterRequirement[]
 }
 
 export interface TraderDefinition {
@@ -355,6 +363,7 @@ export function createDefaultTraderEntry(itemId: string = ''): TraderItemEntry {
     buyRestrictionMax: 200,
     unlimitedStock: false,
     unlimitedBuyRestriction: false,
+    barter: [],
   }
 }
 

@@ -50,6 +50,7 @@ import {
   EffectsDamageProperties,
   TraderDefinition,
   TraderItemEntry,
+  BarterRequirement,
   ValidationError,
   createDefaultPack,
   createDefaultQuestItem,
@@ -346,11 +347,22 @@ function validatePack(pack: ItemPackDefinition): ValidationError[] {
     trader.entries.forEach((entry, ei) => {
       const ePrefix = `${tPrefix}.entries[${ei}]`
       if (!HEX24.test(entry.itemId)) errors.push({ field: `${ePrefix}.itemId`, message: 'Item ID must be 24 hex characters.' })
-      if (entry.priceRoubles < 0) errors.push({ field: `${ePrefix}.priceRoubles`, message: 'Price cannot be negative.' })
       if (entry.loyaltyLevel < 1 || entry.loyaltyLevel > 4) errors.push({ field: `${ePrefix}.loyaltyLevel`, message: 'Loyalty level must be between 1 and 4.' })
       if (entry.stockCount < 0) errors.push({ field: `${ePrefix}.stockCount`, message: 'Stock count cannot be negative.' })
       if (entry.buyRestrictionMax < 0) errors.push({ field: `${ePrefix}.buyRestrictionMax`, message: 'Buy restriction cannot be negative.' })
       if (!itemIds.has(entry.itemId)) errors.push({ field: `${ePrefix}.itemId`, message: 'Trader entry references an item that does not exist in this pack.' })
+
+      if (entry.barter && entry.barter.length > 0) {
+        entry.barter.forEach((req, bi) => {
+          const bPrefix = `${ePrefix}.barter[${bi}]`
+          if (!HEX24.test(req.itemTpl)) errors.push({ field: `${bPrefix}.itemTpl`, message: 'Barter item template must be 24 hex characters.' })
+          if (req.count < 1) errors.push({ field: `${bPrefix}.count`, message: 'Barter count must be at least 1.' })
+          if (req.level !== undefined && req.level < 1) errors.push({ field: `${bPrefix}.level`, message: 'Dogtag level must be at least 1.' })
+          if (req.side !== undefined && !['Bear', 'Usec', 'Any'].includes(req.side)) errors.push({ field: `${bPrefix}.side`, message: 'Side must be Bear, Usec, or Any.' })
+        })
+      } else if (entry.priceRoubles < 0) {
+        errors.push({ field: `${ePrefix}.priceRoubles`, message: 'Price cannot be negative.' })
+      }
     })
   })
 
@@ -1829,6 +1841,36 @@ function TraderEditor({ pack, traderIndex, onChange }: { pack: ItemPackDefinitio
     updateTrader({ entries: trader.entries.filter((_, i) => i !== index) })
   }
 
+  const updateBarter = (entryIndex: number, barterIndex: number, updates: Partial<BarterRequirement>) => {
+    const entry = trader.entries[entryIndex]
+    const current = entry.barter ?? []
+    const nextBarter = [...current]
+    nextBarter[barterIndex] = { ...nextBarter[barterIndex], ...updates }
+    updateEntry(entryIndex, { barter: nextBarter })
+  }
+
+  const addBarter = (entryIndex: number) => {
+    const entry = trader.entries[entryIndex]
+    updateEntry(entryIndex, { barter: [...(entry.barter ?? []), { itemTpl: '', count: 1 }] })
+  }
+
+  const removeBarter = (entryIndex: number, barterIndex: number) => {
+    const entry = trader.entries[entryIndex]
+    updateEntry(entryIndex, { barter: (entry.barter ?? []).filter((_, i) => i !== barterIndex) })
+  }
+
+  const DOGTAG_IDS = [
+    '59f32bb586f774757e1e8442',
+    '59f32c3b86f77472a31742f0',
+    '6662e9aca7e0b43baa3d5f74',
+    '6662e9cda7e0b43baa3d5f76',
+    '6662e9f37fa79a6d83730fa0',
+    '6662ea05f6259762c56f3189',
+    '675dc9d37ae1a8792107ca96',
+    '675dcb0545b1a2d108011b2b',
+  ]
+  const isDogtagId = (id: string) => DOGTAG_IDS.includes(id)
+
   const allItems = [...pack.questItems, ...pack.keys, ...pack.containers, ...pack.stims, ...pack.medkits, ...pack.foodDrinks, ...pack.barters]
   const itemOptions = allItems.map(item => ({
     value: item.id,
@@ -1893,6 +1935,51 @@ function TraderEditor({ pack, traderIndex, onChange }: { pack: ItemPackDefinitio
                     <Toggle checked={entry.unlimitedStock} onChange={v => updateEntry(i, { unlimitedStock: v })} label="Unlimited stock" />
                     <Toggle checked={entry.unlimitedBuyRestriction} onChange={v => updateEntry(i, { unlimitedBuyRestriction: v })} label="Unlimited buy restriction" />
                   </div>
+                </div>
+
+                <div className="mt-4">
+                  <div className="text-sm font-semibold text-tarkov-text mb-2 flex items-center justify-between">
+                    <span>Barter Requirements</span>
+                    <span className="text-xs font-normal text-tarkov-text-dim">Leave empty to sell for roubles.</span>
+                  </div>
+                  {(entry.barter ?? []).map((req, bi) => (
+                    <div key={bi} className="grid grid-cols-1 md:grid-cols-5 gap-3 mb-2 items-end">
+                      <div className="md:col-span-2">
+                        <Field label="Item Tpl" tooltip="24-character item template ID required for this barter.">
+                          <input className="input-field font-mono text-sm" maxLength={24} value={req.itemTpl} onChange={e => updateBarter(i, bi, { itemTpl: e.target.value })} />
+                        </Field>
+                      </div>
+                      <Field label="Count">
+                        <input className="input-field" type="number" min={1} value={req.count} onChange={e => updateBarter(i, bi, { count: parseInt(e.target.value) || 1 })} />
+                      </Field>
+                      {isDogtagId(req.itemTpl) && (
+                        <Field label="Level (dogtag)">
+                          <input className="input-field" type="number" min={0} value={req.level ?? ''} onChange={e => updateBarter(i, bi, { level: e.target.value ? parseInt(e.target.value) : undefined })} />
+                        </Field>
+                      )}
+                      <div className="flex items-center gap-2">
+                        {isDogtagId(req.itemTpl) && (
+                          <Field label="Side" className="flex-1">
+                            <select className="input-field text-sm" value={req.side ?? ''} onChange={e => updateBarter(i, bi, { side: e.target.value || undefined })}>
+                              <option value="">—</option>
+                              <option value="Bear">Bear</option>
+                              <option value="Usec">Usec</option>
+                              <option value="Any">Any</option>
+                            </select>
+                          </Field>
+                        )}
+                        <button className="btn-danger text-xs px-2 py-2 h-fit" onClick={() => removeBarter(i, bi)} title="Remove">
+                          <Trash2 size={14} />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                  {(entry.barter ?? []).length === 0 && (
+                    <div className="text-sm text-tarkov-text-dim">No barter requirements. The item will be sold for roubles.</div>
+                  )}
+                  <button className="btn-secondary text-xs flex items-center gap-1 mt-2" onClick={() => addBarter(i)}>
+                    <Plus size={14} /> Add Barter Item
+                  </button>
                 </div>
               </div>
             )
