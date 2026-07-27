@@ -95,6 +95,26 @@ export const MAP_NAMES = [
   'Junk',
 ] as const
 
+export const BK_LOOT_TYPES = [
+  'Jacket',
+  'Toolbox',
+  'Drawer',
+  'Crate',
+  'SportBag',
+  'Medbag',
+  'PC',
+  'Grenade',
+  'DeadBody',
+  'Ammo',
+  'Weapon',
+  'CashReg',
+  'Safe',
+  'LooseVals',
+  'LooseCash',
+  'LooseLoot',
+  'LooseGear',
+] as const
+
 export interface KeyDefinition extends ItemDefinition {
   uses: number
   keyCategory: string

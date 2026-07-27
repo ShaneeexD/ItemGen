@@ -234,6 +234,13 @@ public static class KeyGenerator
         return "5b47574386f77428ca22b33f"; // Keys
     }
 
+    private static readonly HashSet<string> ValidBkLootTypes = new()
+    {
+        "Jacket", "Toolbox", "Drawer", "Crate", "SportBag", "Medbag",
+        "PC", "Grenade", "DeadBody", "Ammo", "Weapon", "CashReg",
+        "Safe", "LooseVals", "LooseCash", "LooseLoot", "LooseGear"
+    };
+
     private static void PatchBetterKeysDb(List<KeyDefinition> mapKeys, ISptLogger<ItemGenPlugin> logger)
     {
         var modsDir = IOPath.Combine(Directory.GetCurrentDirectory(), "user", "mods");
@@ -267,16 +274,16 @@ public static class KeyGenerator
                 var keysObj = root["Keys"] as JsonObject ?? new JsonObject();
                 root["Keys"] = keysObj;
 
-                // Don't add if already present (idempotent)
-                if (keysObj.ContainsKey(def.Id))
-                    continue;
+                // Filter loot types to only valid BetterKeys locale keys
+                var validLoot = def.BkLoot.Where(l => ValidBkLootTypes.Contains(l)).ToList();
 
+                // Always update (handles both new and existing keys)
                 keysObj[def.Id] = new JsonObject
                 {
                     ["Tips"] = new JsonArray(def.BkTips.Select(t => (JsonNode)t).ToArray()),
                     ["Extract"] = new JsonArray(def.BkExtracts.Select(t => (JsonNode)t).ToArray()),
                     ["Quests"] = new JsonArray(def.BkQuests.Select(t => (JsonNode)t).ToArray()),
-                    ["Loot"] = new JsonArray(def.BkLoot.Select(t => (JsonNode)t).ToArray()),
+                    ["Loot"] = new JsonArray(validLoot.Select(t => (JsonNode)t).ToArray()),
                 };
 
                 var newJson = root.ToJsonString(new JsonSerializerOptions { WriteIndented = true });

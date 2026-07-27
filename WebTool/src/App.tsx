@@ -69,6 +69,7 @@ import {
   ITEM_PARENT_NAMES,
   VANILLA_TRADERS,
   MAP_NAMES,
+  BK_LOOT_TYPES,
 } from './types'
 import { QUEST_TEMPLATES } from './generated_quest_templates'
 import { KEY_TEMPLATES } from './generated_key_templates'
@@ -683,12 +684,10 @@ function BetterKeysSection({ item, onChange }: { item: KeyDefinition; onChange: 
   const [tipsText, setTipsText] = useState(item.bkTips.join(', '))
   const [extractsText, setExtractsText] = useState(item.bkExtracts.join(', '))
   const [questsText, setQuestsText] = useState(item.bkQuests.join(', '))
-  const [lootText, setLootText] = useState(item.bkLoot.join(', '))
 
   useEffect(() => { setTipsText(item.bkTips.join(', ')) }, [item.bkTips])
   useEffect(() => { setExtractsText(item.bkExtracts.join(', ')) }, [item.bkExtracts])
   useEffect(() => { setQuestsText(item.bkQuests.join(', ')) }, [item.bkQuests])
-  useEffect(() => { setLootText(item.bkLoot.join(', ')) }, [item.bkLoot])
 
   const splitCsv = (s: string) => s.split(',').map(x => x.trim()).filter(Boolean)
 
@@ -726,8 +725,25 @@ function BetterKeysSection({ item, onChange }: { item: KeyDefinition; onChange: 
               <Field label="Required in Quests" tooltip="Comma-separated quest IDs this key is required for. Shown in the key description by BetterKeys.">
                 <input className="input-field" placeholder="e.g. 5967530a86f77462ba22226b" value={questsText} onChange={e => setQuestsText(e.target.value)} onBlur={() => onChange({ bkQuests: splitCsv(questsText) })} />
               </Field>
-              <Field label="Behind the Lock" tooltip="Comma-separated loot types found behind this locked door (e.g. 'Jacket', 'Weapon', 'Medbag'). Shown in the key description by BetterKeys.">
-                <input className="input-field" placeholder="e.g. Jacket, Weapon, Medbag" value={lootText} onChange={e => setLootText(e.target.value)} onBlur={() => onChange({ bkLoot: splitCsv(lootText) })} />
+              <Field label="Behind the Lock" tooltip="Select loot types found behind this locked door. These are shown in the key description by BetterKeys.">
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-2 mt-1">
+                  {BK_LOOT_TYPES.map(type => (
+                    <label key={type} className="flex items-center gap-2 text-sm text-tarkov-text cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={item.bkLoot.includes(type)}
+                        onChange={e => {
+                          if (e.target.checked) {
+                            onChange({ bkLoot: [...item.bkLoot, type] })
+                          } else {
+                            onChange({ bkLoot: item.bkLoot.filter(l => l !== type) })
+                          }
+                        }}
+                      />
+                      {type}
+                    </label>
+                  ))}
+                </div>
               </Field>
             </div>
           )}
