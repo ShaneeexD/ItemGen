@@ -400,6 +400,17 @@ public class KeyDefinition : ItemDefinition
     [JsonPropertyName("doorIds")]
     public List<string> DoorIds { get; set; } = [];
 
+    /// <summary>
+    /// Optional map name for BetterKeys color compatibility.
+    /// When set and no explicit backgroundColor is provided, the key
+    /// will use the BetterKeys color for this map.
+    /// Valid values: "Customs", "Factory", "Woods", "Shoreline",
+    /// "Interchange", "The Lab", "Reserve", "Lighthouse",
+    /// "Streets of Tarkov", "Ground Zero", "The Labyrinth", "Junk"
+    /// </summary>
+    [JsonPropertyName("map")]
+    public string? Map { get; set; }
+
     [JsonPropertyName("properties")]
     public JsonElement Properties { get; set; }
 }

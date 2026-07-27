@@ -121,6 +121,8 @@ public static class MedKitGenerator
             var items = databaseService.GetItems();
             if (items.TryGetValue(def.Id, out var tpl) && tpl.Properties != null)
             {
+                logger.LogWithColor($"[ItemGen] MedKit '{def.Name}' registered. BackgroundColor = '{tpl.Properties.BackgroundColor}', Parent = '{tpl.Parent}'", LogTextColor.Gray);
+
                 if (!string.IsNullOrWhiteSpace(customPrefabPath) && tpl.Properties.Prefab != null)
                 {
                     tpl.Properties.Prefab.Path = customPrefabPath;

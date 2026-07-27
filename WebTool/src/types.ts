@@ -80,10 +80,26 @@ export interface QuestItemDefinition extends ItemDefinition {
   properties: Record<string, any>
 }
 
+export const MAP_NAMES = [
+  'Customs',
+  'Factory',
+  'Woods',
+  'Shoreline',
+  'Interchange',
+  'The Lab',
+  'Reserve',
+  'Lighthouse',
+  'Streets of Tarkov',
+  'Ground Zero',
+  'The Labyrinth',
+  'Junk',
+] as const
+
 export interface KeyDefinition extends ItemDefinition {
   uses: number
   keyCategory: string
   doorIds: string[]
+  map?: string
   properties: Record<string, any>
 }
 
@@ -247,6 +263,7 @@ export function createDefaultKey(): KeyDefinition {
     uses: 40,
     keyCategory: '',
     doorIds: [],
+    map: undefined,
     properties: {},
     loot: createDefaultLootEntry(),
     crafting: createDefaultCraftingEntry(),

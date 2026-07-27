@@ -68,6 +68,7 @@ import {
   getParentName,
   ITEM_PARENT_NAMES,
   VANILLA_TRADERS,
+  MAP_NAMES,
 } from './types'
 import { QUEST_TEMPLATES } from './generated_quest_templates'
 import { KEY_TEMPLATES } from './generated_key_templates'
@@ -1618,6 +1619,18 @@ export default function App() {
                     </div>
                     <Field label="Door IDs (optional)" tooltip="Comma-separated vanilla door IDs this key opens. These are patched into the key's KeyIds on the server. Leave empty to inherit from the base template." className="mt-4">
                       <input className="input-field" placeholder="e.g. 123456789012345678901234, 567890123456789012345678" value={(selectedItem as KeyDefinition).doorIds.join(', ')} onChange={e => updateItem(selectedIndex, { doorIds: e.target.value.split(',').map(s => s.trim()) })} />
+                    </Field>
+                    <Field label="BetterKeys Map (optional)" tooltip="When set, ItemGen will apply the BetterKeys background color for this map and register the key in BetterKeys' db so it gets proper description info. If Background Color is set explicitly above, it takes priority. Only effective when BetterKeys mod is installed; falls back to default map colors otherwise." className="mt-4">
+                      <select
+                        className="input-field"
+                        value={(selectedItem as KeyDefinition).map ?? ''}
+                        onChange={e => updateItem(selectedIndex, { map: e.target.value || undefined })}
+                      >
+                        <option value="">None (use Background Color)</option>
+                        {MAP_NAMES.map(m => (
+                          <option key={m} value={m}>{m}</option>
+                        ))}
+                      </select>
                     </Field>
                     <div className="mt-3 text-sm text-tarkov-text-dim bg-tarkov-bg border border-tarkov-border rounded p-3">
                       <span className="text-tarkov-accent font-semibold">Note:</span> Door IDs should be vanilla EFT door IDs. Custom doors added by mods such as Map Editor Lite can have the key ID set in the editor, and Map Editor Lite can also dump door IDs while in raid.
