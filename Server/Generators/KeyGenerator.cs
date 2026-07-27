@@ -126,7 +126,7 @@ public static class KeyGenerator
         overrides.CanSellOnRagfair = def.CanSellOnRagfair;
         overrides.RarityPvE = def.RarityPvE;
 
-        // Do not override the model via clone properties; custom bundle paths are injected after creation (see VPOAmmo pattern).
+        // Do not override the model via clone properties; custom bundle paths are injected after creation.
         var customPrefabPath = GetPropertyPath(def.Properties, "Prefab");
         var customUsePrefabPath = GetPropertyPath(def.Properties, "UsePrefab");
         overrides.Prefab = null;
@@ -274,11 +274,8 @@ public static class KeyGenerator
                 var keysObj = root["Keys"] as JsonObject ?? new JsonObject();
                 root["Keys"] = keysObj;
 
-                // Filter loot types to only valid BetterKeys locale keys
                 var validLoot = def.BkLoot.Where(l => ValidBkLootTypes.Contains(l)).ToList();
 
-                // Filter quest IDs to only those that exist in the database
-                // (BetterKeys does locale[$"{q} name"] which throws if the quest is unknown)
                 var quests = databaseService.GetQuests();
                 var validQuests = def.BkQuests.Where(q => quests.ContainsKey(q)).ToList();
                 if (validQuests.Count != def.BkQuests.Count)
@@ -340,13 +337,11 @@ public static class KeyGenerator
 
     private static Dictionary<string, string> LoadBetterKeysColors()
     {
-        // Try to read BetterKeys' config from user/mods/ directories
         var modsDir = IOPath.Combine(Directory.GetCurrentDirectory(), "user", "mods");
         if (Directory.Exists(modsDir))
         {
             foreach (var modDir in Directory.GetDirectories(modsDir))
             {
-                // Look for config/config.jsonc or config/configuser.jsonc
                 var configPath = IOPath.Combine(modDir, "config", "configuser.jsonc");
                 if (!File.Exists(configPath))
                     configPath = IOPath.Combine(modDir, "config", "config.jsonc");
