@@ -77,7 +77,7 @@ public static class KeyGenerator
             .ToList();
         if (mapKeys.Count > 0)
         {
-            PatchBetterKeysDb(mapKeys, logger);
+            PatchBetterKeysDb(mapKeys, databaseService, logger);
         }
 
         return registered;
@@ -241,7 +241,7 @@ public static class KeyGenerator
         "Safe", "LooseVals", "LooseCash", "LooseLoot", "LooseGear"
     };
 
-    private static void PatchBetterKeysDb(List<KeyDefinition> mapKeys, ISptLogger<ItemGenPlugin> logger)
+    private static void PatchBetterKeysDb(List<KeyDefinition> mapKeys, DatabaseService databaseService, ISptLogger<ItemGenPlugin> logger)
     {
         var modsDir = IOPath.Combine(Directory.GetCurrentDirectory(), "user", "mods");
         if (!Directory.Exists(modsDir))
@@ -277,12 +277,24 @@ public static class KeyGenerator
                 // Filter loot types to only valid BetterKeys locale keys
                 var validLoot = def.BkLoot.Where(l => ValidBkLootTypes.Contains(l)).ToList();
 
+                // Filter quest IDs to only those that exist in the database
+                // (BetterKeys does locale[$"{q} name"] which throws if the quest is unknown)
+                var quests = databaseService.GetQuests();
+                var validQuests = def.BkQuests.Where(q => quests.ContainsKey(q)).ToList();
+                if (validQuests.Count != def.BkQuests.Count)
+                {
+                    var skipped = def.BkQuests.Except(validQuests);
+                    logger.LogWithColor(
+                        $"[ItemGen] Skipped invalid quest ID(s) for key '{def.Name}': {string.Join(", ", skipped)}",
+                        LogTextColor.Yellow);
+                }
+
                 // Always update (handles both new and existing keys)
                 keysObj[def.Id] = new JsonObject
                 {
                     ["Tips"] = new JsonArray(def.BkTips.Select(t => (JsonNode)t).ToArray()),
                     ["Extract"] = new JsonArray(def.BkExtracts.Select(t => (JsonNode)t).ToArray()),
-                    ["Quests"] = new JsonArray(def.BkQuests.Select(t => (JsonNode)t).ToArray()),
+                    ["Quests"] = new JsonArray(validQuests.Select(t => (JsonNode)t).ToArray()),
                     ["Loot"] = new JsonArray(validLoot.Select(t => (JsonNode)t).ToArray()),
                 };
 
