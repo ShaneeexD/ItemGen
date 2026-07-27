@@ -273,10 +273,10 @@ public static class KeyGenerator
 
                 keysObj[def.Id] = new JsonObject
                 {
-                    ["Tips"] = new JsonArray(),
-                    ["Extract"] = new JsonArray(),
-                    ["Quests"] = new JsonArray(),
-                    ["Loot"] = new JsonArray(),
+                    ["Tips"] = new JsonArray(def.BkTips.Select(t => (JsonNode)t).ToArray()),
+                    ["Extract"] = new JsonArray(def.BkExtracts.Select(t => (JsonNode)t).ToArray()),
+                    ["Quests"] = new JsonArray(def.BkQuests.Select(t => (JsonNode)t).ToArray()),
+                    ["Loot"] = new JsonArray(def.BkLoot.Select(t => (JsonNode)t).ToArray()),
                 };
 
                 var newJson = root.ToJsonString(new JsonSerializerOptions { WriteIndented = true });

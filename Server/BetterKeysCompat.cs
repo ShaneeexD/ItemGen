@@ -6,12 +6,13 @@ using SPTarkov.Server.Core.DI;
 using SPTarkov.Server.Core.Models.Logging;
 using SPTarkov.Server.Core.Models.Utils;
 using SPTarkov.Server.Core.Services;
+using SPTarkov.Server.Core.Servers;
 using ItemGen.Generators;
 
 namespace ItemGen;
 
 [Injectable(TypePriority = OnLoadOrder.PostSptModLoader + 2)]
-public class BetterKeysCompat(DatabaseService databaseService, ISptLogger<ItemGenPlugin> logger) : IOnLoad
+public class BetterKeysCompat(DatabaseServer databaseServer, ISptLogger<ItemGenPlugin> logger) : IOnLoad
 {
     public Task OnLoad()
     {
@@ -26,31 +27,53 @@ public class BetterKeysCompat(DatabaseService databaseService, ISptLogger<ItemGe
             $"[ItemGen] BetterKeysCompat: BetterKeys {(isBetterKeysInstalled ? "detected" : "not detected")}, {colors.Count} map colors available.",
             LogTextColor.Gray);
 
-        var items = databaseService.GetItems();
+        var items = databaseServer.GetTables().Templates.Items;
         var reapplied = 0;
 
         foreach (var (keyId, (map, explicitColor)) in KeyGenerator.RegisteredKeyColors)
         {
             if (!items.TryGetValue(keyId, out var tpl) || tpl.Properties == null)
+            {
+                logger.LogWithColor($"[ItemGen] BetterKeysCompat: key '{keyId}' not found in items db or properties null", LogTextColor.Yellow);
                 continue;
+            }
+
+            var beforeColor = tpl.Properties.BackgroundColor ?? "(none)";
 
             string? color = null;
 
-            // Explicit backgroundColor always takes priority
-            if (!string.IsNullOrWhiteSpace(explicitColor))
+            if (isBetterKeysInstalled && !string.IsNullOrWhiteSpace(map))
             {
-                color = explicitColor;
-            }
-            else if (!string.IsNullOrWhiteSpace(map))
-            {
-                // Look up the color for this map from BetterKeys config (or our defaults)
+                // BetterKeys is installed — use its map color (takes priority over explicit)
                 colors.TryGetValue(map, out color);
+            }
+
+            if (string.IsNullOrWhiteSpace(color))
+            {
+                // Fallback: explicit backgroundColor, then map default color
+                if (!string.IsNullOrWhiteSpace(explicitColor))
+                {
+                    color = explicitColor;
+                }
+                else if (!string.IsNullOrWhiteSpace(map))
+                {
+                    colors.TryGetValue(map, out color);
+                }
             }
 
             if (!string.IsNullOrWhiteSpace(color))
             {
                 tpl.Properties.BackgroundColor = color;
                 reapplied++;
+                logger.LogWithColor(
+                    $"[ItemGen] BetterKeysCompat: key '{keyId}' map='{map}' color '{beforeColor}' -> '{color}' (explicit={explicitColor ?? "null"})",
+                    LogTextColor.Gray);
+            }
+            else
+            {
+                logger.LogWithColor(
+                    $"[ItemGen] BetterKeysCompat: key '{keyId}' map='{map}' — no color resolved (explicit={explicitColor ?? "null"})",
+                    LogTextColor.Yellow);
             }
         }
 

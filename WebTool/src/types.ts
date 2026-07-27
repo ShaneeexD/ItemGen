@@ -100,6 +100,10 @@ export interface KeyDefinition extends ItemDefinition {
   keyCategory: string
   doorIds: string[]
   map?: string
+  bkTips: string[]
+  bkExtracts: string[]
+  bkQuests: string[]
+  bkLoot: string[]
   properties: Record<string, any>
 }
 
@@ -264,6 +268,10 @@ export function createDefaultKey(): KeyDefinition {
     keyCategory: '',
     doorIds: [],
     map: undefined,
+    bkTips: [],
+    bkExtracts: [],
+    bkQuests: [],
+    bkLoot: [],
     properties: {},
     loot: createDefaultLootEntry(),
     crafting: createDefaultCraftingEntry(),

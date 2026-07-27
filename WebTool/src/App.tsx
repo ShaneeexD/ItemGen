@@ -678,6 +678,65 @@ function CraftingEntryEditor({
   )
 }
 
+function BetterKeysSection({ item, onChange }: { item: KeyDefinition; onChange: (updates: Partial<KeyDefinition>) => void }) {
+  const [expanded, setExpanded] = useState(false)
+  const [tipsText, setTipsText] = useState(item.bkTips.join(', '))
+  const [extractsText, setExtractsText] = useState(item.bkExtracts.join(', '))
+  const [questsText, setQuestsText] = useState(item.bkQuests.join(', '))
+  const [lootText, setLootText] = useState(item.bkLoot.join(', '))
+
+  useEffect(() => { setTipsText(item.bkTips.join(', ')) }, [item.bkTips])
+  useEffect(() => { setExtractsText(item.bkExtracts.join(', ')) }, [item.bkExtracts])
+  useEffect(() => { setQuestsText(item.bkQuests.join(', ')) }, [item.bkQuests])
+  useEffect(() => { setLootText(item.bkLoot.join(', ')) }, [item.bkLoot])
+
+  const splitCsv = (s: string) => s.split(',').map(x => x.trim()).filter(Boolean)
+
+  return (
+    <div className="mt-6 border-t border-tarkov-border pt-4">
+      <button type="button" onClick={() => setExpanded(v => !v)} className="flex items-center gap-2 text-sm font-semibold text-tarkov-text hover:text-tarkov-accent">
+        {expanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+        BetterKeys Compatibility
+      </button>
+      {expanded && (
+        <div className="mt-3 space-y-4">
+          <p className="text-xs text-tarkov-text-dim">
+            Configure how this key integrates with the BetterKeys mod. When a map is set, ItemGen registers the key in BetterKeys' database so it gets the correct background color and description info.
+          </p>
+          <Field label="Map" tooltip="When set, ItemGen applies the BetterKeys background color for this map and registers the key in BetterKeys' db. If Background Color is set explicitly above, it takes priority over the map color.">
+            <select
+              className="input-field"
+              value={item.map ?? ''}
+              onChange={e => onChange({ map: e.target.value || undefined })}
+            >
+              <option value="">None (use Background Color)</option>
+              {MAP_NAMES.map(m => (
+                <option key={m} value={m}>{m}</option>
+              ))}
+            </select>
+          </Field>
+          {item.map && item.map !== 'Junk' && (
+            <div className="space-y-3 pl-2 border-l-2 border-tarkov-border">
+              <Field label="Tips" tooltip="Comma-separated tips about this key (e.g. 'Shared key', 'Single use'). Shown in the key description by BetterKeys.">
+                <input className="input-field" placeholder="e.g. Shared key, Single use" value={tipsText} onChange={e => setTipsText(e.target.value)} onBlur={() => onChange({ bkTips: splitCsv(tipsText) })} />
+              </Field>
+              <Field label="Required for Extracts" tooltip="Comma-separated extract names this key is required for (e.g. 'ZB-013', 'Gate 0'). Shown in the key description by BetterKeys.">
+                <input className="input-field" placeholder="e.g. ZB-013, Gate 0" value={extractsText} onChange={e => setExtractsText(e.target.value)} onBlur={() => onChange({ bkExtracts: splitCsv(extractsText) })} />
+              </Field>
+              <Field label="Required in Quests" tooltip="Comma-separated quest IDs this key is required for. Shown in the key description by BetterKeys.">
+                <input className="input-field" placeholder="e.g. 5967530a86f77462ba22226b" value={questsText} onChange={e => setQuestsText(e.target.value)} onBlur={() => onChange({ bkQuests: splitCsv(questsText) })} />
+              </Field>
+              <Field label="Behind the Lock" tooltip="Comma-separated loot types found behind this locked door (e.g. 'Jacket', 'Weapon', 'Medbag'). Shown in the key description by BetterKeys.">
+                <input className="input-field" placeholder="e.g. Jacket, Weapon, Medbag" value={lootText} onChange={e => setLootText(e.target.value)} onBlur={() => onChange({ bkLoot: splitCsv(lootText) })} />
+              </Field>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
 function RawPropertiesPanel({ properties, onChange, title = 'Raw Properties JSON' }: { properties: Record<string, any>; onChange: (properties: Record<string, any>) => void; title?: string }) {
   const [expanded, setExpanded] = useState(false)
   const [rawProps, setRawProps] = useState(JSON.stringify(properties || {}, null, 2))
@@ -1045,6 +1104,10 @@ export default function App() {
         })),
         keys: (imported.keys || []).map(k => ({
           ...k,
+          bkTips: k.bkTips ?? [],
+          bkExtracts: k.bkExtracts ?? [],
+          bkQuests: k.bkQuests ?? [],
+          bkLoot: k.bkLoot ?? [],
           loot: k.loot ?? createDefaultLootEntry(),
           crafting: k.crafting ?? createDefaultCraftingEntry(),
         })),
@@ -1620,21 +1683,11 @@ export default function App() {
                     <Field label="Door IDs (optional)" tooltip="Comma-separated vanilla door IDs this key opens. These are patched into the key's KeyIds on the server. Leave empty to inherit from the base template." className="mt-4">
                       <input className="input-field" placeholder="e.g. 123456789012345678901234, 567890123456789012345678" value={(selectedItem as KeyDefinition).doorIds.join(', ')} onChange={e => updateItem(selectedIndex, { doorIds: e.target.value.split(',').map(s => s.trim()) })} />
                     </Field>
-                    <Field label="BetterKeys Map (optional)" tooltip="When set, ItemGen will apply the BetterKeys background color for this map and register the key in BetterKeys' db so it gets proper description info. If Background Color is set explicitly above, it takes priority. Only effective when BetterKeys mod is installed; falls back to default map colors otherwise." className="mt-4">
-                      <select
-                        className="input-field"
-                        value={(selectedItem as KeyDefinition).map ?? ''}
-                        onChange={e => updateItem(selectedIndex, { map: e.target.value || undefined })}
-                      >
-                        <option value="">None (use Background Color)</option>
-                        {MAP_NAMES.map(m => (
-                          <option key={m} value={m}>{m}</option>
-                        ))}
-                      </select>
-                    </Field>
                     <div className="mt-3 text-sm text-tarkov-text-dim bg-tarkov-bg border border-tarkov-border rounded p-3">
                       <span className="text-tarkov-accent font-semibold">Note:</span> Door IDs should be vanilla EFT door IDs. Custom doors added by mods such as Map Editor Lite can have the key ID set in the editor, and Map Editor Lite can also dump door IDs while in raid.
                     </div>
+
+                    <BetterKeysSection item={selectedItem as KeyDefinition} onChange={updates => updateItem(selectedIndex, updates)} />
 
                     <RawPropertiesPanel properties={(selectedItem as KeyDefinition).properties} onChange={next => updateItem(selectedIndex, { properties: next })} />
                   </Section>

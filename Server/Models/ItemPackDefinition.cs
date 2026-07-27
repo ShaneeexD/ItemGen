@@ -411,6 +411,18 @@ public class KeyDefinition : ItemDefinition
     [JsonPropertyName("map")]
     public string? Map { get; set; }
 
+    [JsonPropertyName("bkTips")]
+    public List<string> BkTips { get; set; } = [];
+
+    [JsonPropertyName("bkExtracts")]
+    public List<string> BkExtracts { get; set; } = [];
+
+    [JsonPropertyName("bkQuests")]
+    public List<string> BkQuests { get; set; } = [];
+
+    [JsonPropertyName("bkLoot")]
+    public List<string> BkLoot { get; set; } = [];
+
     [JsonPropertyName("properties")]
     public JsonElement Properties { get; set; }
 }
