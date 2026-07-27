@@ -1666,17 +1666,23 @@ export default function App() {
                         <input className="input-field" value={(selectedItem as KeyDefinition).keyCategory} onChange={e => updateItem(selectedIndex, { keyCategory: e.target.value })} />
                       </Field>
                     </div>
+                    <Field label="Item Sound" tooltip="Sound identifier used when moving the key." className="mt-4">
+                      <input className="input-field" value={(selectedItem as KeyDefinition).properties.ItemSound ?? ''} onChange={e => {
+                        const key = selectedItem as KeyDefinition
+                        updateItem(selectedIndex, { properties: { ...key.properties, ItemSound: e.target.value } })
+                      }} />
+                    </Field>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
-                      <Field label="Item Sound" tooltip="Sound identifier used when moving the key.">
-                        <input className="input-field" value={(selectedItem as KeyDefinition).properties.ItemSound ?? ''} onChange={e => {
-                          const key = selectedItem as KeyDefinition
-                          updateItem(selectedIndex, { properties: { ...key.properties, ItemSound: e.target.value } })
-                        }} />
-                      </Field>
-                      <Field label="Custom Model" tooltip="Custom bundle filename (e.g. my_key.bundle). The client plugin matches this to a file in BepInEx\plugins\Serenity-ItemGen\bundles. Leave empty to inherit from the base template.">
+                      <Field label="Custom Model" tooltip="Custom bundle filename for the inventory model (e.g. my_key.bundle). The client plugin matches this to a file in BepInEx\plugins\Serenity-ItemGen\bundles. Leave empty to inherit from the base template.">
                         <input className="input-field" value={(selectedItem as KeyDefinition).properties.Prefab?.path ?? ''} onChange={e => {
                           const key = selectedItem as KeyDefinition
                           updateItem(selectedIndex, { properties: { ...key.properties, Prefab: { ...key.properties.Prefab, path: e.target.value } } })
+                        }} placeholder="my_key.bundle" />
+                      </Field>
+                      <Field label="Use Model" tooltip="Custom bundle filename for the in-hand/interaction model. Leave empty to inherit from the base template.">
+                        <input className="input-field" value={(selectedItem as KeyDefinition).properties.UsePrefab?.path ?? ''} onChange={e => {
+                          const key = selectedItem as KeyDefinition
+                          updateItem(selectedIndex, { properties: { ...key.properties, UsePrefab: { ...key.properties.UsePrefab, path: e.target.value } } })
                         }} placeholder="my_key.bundle" />
                       </Field>
                     </div>
