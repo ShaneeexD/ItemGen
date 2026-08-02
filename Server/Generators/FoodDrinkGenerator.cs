@@ -5,12 +5,12 @@ using SPTarkov.Server.Core.Models.Common;
 using SPTarkov.Server.Core.Models.Eft.Common;
 using SPTarkov.Server.Core.Models.Eft.Common.Tables;
 using SPTarkov.Server.Core.Models.Enums;
-using SPTarkov.Server.Core.Models.Logging;
+using SPTarkov.Server.Core.Models.Spt.Tables;
+using SPTarkov.Common.Models.Logging;
 using SPTarkov.Server.Core.Models.Spt.Mod;
-using SPTarkov.Server.Core.Models.Utils;
-using SPTarkov.Server.Core.Services;
-using SPTarkov.Server.Core.Services.Mod;
+using SPTarkov.Server.Core.Services.Modding.Custom;
 using ItemGen.Models;
+using SpectreColor = Spectre.Console.Color;
 
 namespace ItemGen.Generators;
 
@@ -21,7 +21,8 @@ public static class FoodDrinkGenerator
 
     public static int RegisterAll(
         CustomItemService customItemService,
-        DatabaseService databaseService,
+        TemplateTable templateTable,
+        GlobalTable globalTable,
         IReadOnlyList<FoodDrinkDefinition> definitions,
         ISptLogger<ItemGenPlugin> logger)
     {
@@ -30,14 +31,14 @@ public static class FoodDrinkGenerator
         {
             try
             {
-                if (RegisterFoodDrink(def, customItemService, databaseService, logger))
+                if (RegisterFoodDrink(def, customItemService, templateTable, globalTable, logger))
                 {
                     registered++;
                 }
             }
             catch (Exception ex)
             {
-                logger.LogWithColor($"[ItemGen] Failed to register food/drink '{def.Name}': {ex.Message}", LogTextColor.Red);
+                logger.LogWithColor($"[ItemGen] Failed to register food/drink '{def.Name}': {ex.Message}", SpectreColor.Red);
             }
         }
 
@@ -47,11 +48,12 @@ public static class FoodDrinkGenerator
     private static bool RegisterFoodDrink(
         FoodDrinkDefinition def,
         CustomItemService customItemService,
-        DatabaseService databaseService,
+        TemplateTable templateTable,
+        GlobalTable globalTable,
         ISptLogger<ItemGenPlugin> logger)
     {
-        var parentId = ResolveParentId(databaseService, def.BaseTpl);
-        var handbookParentId = ResolveHandbookParent(databaseService, def.BaseTpl);
+        var parentId = ResolveParentId(templateTable, def.BaseTpl);
+        var handbookParentId = ResolveHandbookParent(templateTable, def.BaseTpl);
 
         TemplateItemProperties? overrides = null;
         if (def.Properties.ValueKind != JsonValueKind.Undefined && def.Properties.ValueKind != JsonValueKind.Null)
@@ -106,6 +108,7 @@ public static class FoodDrinkGenerator
         var details = new NewItemFromCloneDetails
         {
             NewId = def.Id,
+            NewItemName = def.Name,
             ItemTplToClone = def.BaseTpl,
             ParentId = parentId,
             HandbookParentId = handbookParentId,
@@ -128,9 +131,9 @@ public static class FoodDrinkGenerator
         if (result.Success == true)
         {
             var needsBuffKey = !string.IsNullOrWhiteSpace(def.StimulatorBuffs) || def.CustomBuffs.Count > 0;
-            StimGenerator.PatchStimulatorBuffs(databaseService, def.Id, def.Name, def.StimulatorBuffs, def.CustomBuffs, buffSetKey, needsBuffKey, logger, false);
+            StimGenerator.PatchStimulatorBuffs(globalTable, templateTable, def.Id, def.Name, def.StimulatorBuffs, def.CustomBuffs, buffSetKey, needsBuffKey, logger, false);
 
-            var items = databaseService.GetItems();
+            var items = templateTable.Items;
             if (items.TryGetValue(def.Id, out var tpl) && tpl.Properties != null)
             {
                 tpl.Properties.Width = def.Width;
@@ -163,7 +166,7 @@ public static class FoodDrinkGenerator
             {
                 logger.LogWithColor(
                     $"[ItemGen] Could not inject bundle path for food/drink '{def.Name}' - item not found after clone.",
-                    LogTextColor.Yellow);
+                    SpectreColor.Yellow);
             }
 
             return true;
@@ -171,7 +174,7 @@ public static class FoodDrinkGenerator
 
         logger.LogWithColor(
             $"[ItemGen] CreateItemFromClone reported failure for food/drink '{def.Name}': {string.Join(", ", result.Errors ?? [])}",
-            LogTextColor.Yellow);
+            SpectreColor.Yellow);
         return false;
     }
 
@@ -193,9 +196,9 @@ public static class FoodDrinkGenerator
         return null;
     }
 
-    private static string ResolveParentId(DatabaseService databaseService, string baseTpl)
+    private static string ResolveParentId(TemplateTable templateTable, string baseTpl)
     {
-        var items = databaseService.GetItems();
+        var items = templateTable.Items;
         if (items.TryGetValue(baseTpl, out var baseItem) && !string.IsNullOrWhiteSpace(baseItem.Parent))
         {
             return baseItem.Parent;
@@ -203,12 +206,12 @@ public static class FoodDrinkGenerator
         return FoodDrinkParentId;
     }
 
-    private static string ResolveHandbookParent(DatabaseService databaseService, string baseTpl)
+    private static string ResolveHandbookParent(TemplateTable templateTable, string baseTpl)
     {
-        var items = databaseService.GetItems();
+        var items = templateTable.Items;
         if (items.TryGetValue(baseTpl, out var baseItem))
         {
-            var handbook = databaseService.GetHandbook().Items.FirstOrDefault(h => h.Id == baseTpl);
+            var handbook = templateTable.Handbook.Items.FirstOrDefault(h => h.Id == baseTpl);
             if (handbook != null && !string.IsNullOrWhiteSpace(handbook.ParentId))
             {
                 return handbook.ParentId;

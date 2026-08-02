@@ -3,18 +3,17 @@ using IOPath = System.IO.Path;
 using System.Text.RegularExpressions;
 using SPTarkov.DI.Annotations;
 using SPTarkov.Server.Core.DI;
-using SPTarkov.Server.Core.Models.Logging;
-using SPTarkov.Server.Core.Models.Utils;
-using SPTarkov.Server.Core.Services;
-using SPTarkov.Server.Core.Servers;
+using SPTarkov.Common.Models.Logging;
+using SPTarkov.Server.Core.Models.Spt.Tables;
 using ItemGen.Generators;
+using Spectre.Console;
 
 namespace ItemGen;
 
-[Injectable(TypePriority = OnLoadOrder.PostSptModLoader + 2)]
-public class BetterKeysCompat(DatabaseServer databaseServer, ISptLogger<ItemGenPlugin> logger) : IOnLoad
+[Injectable(TypePriority = OnLoadOrder.PostLoad + 2)]
+public class BetterKeysCompat(TemplateTable templateTable, ISptLogger<ItemGenPlugin> logger) : IOnLoad
 {
-    public Task OnLoad()
+    public Task OnLoadAsync(CancellationToken cancellationToken)
     {
         if (KeyGenerator.RegisteredKeyColors.Count == 0)
             return Task.CompletedTask;
@@ -25,16 +24,16 @@ public class BetterKeysCompat(DatabaseServer databaseServer, ISptLogger<ItemGenP
 
         logger.LogWithColor(
             $"[ItemGen] BetterKeysCompat: BetterKeys {(isBetterKeysInstalled ? "detected" : "not detected")}, {colors.Count} map colors available.",
-            LogTextColor.Gray);
+            Color.Grey);
 
-        var items = databaseServer.GetTables().Templates.Items;
+        var items = templateTable.Items;
         var reapplied = 0;
 
         foreach (var (keyId, (map, explicitColor)) in KeyGenerator.RegisteredKeyColors)
         {
             if (!items.TryGetValue(keyId, out var tpl) || tpl.Properties == null)
             {
-                logger.LogWithColor($"[ItemGen] BetterKeysCompat: key '{keyId}' not found in items db or properties null", LogTextColor.Yellow);
+                logger.LogWithColor($"[ItemGen] BetterKeysCompat: key '{keyId}' not found in items db or properties null", Color.Yellow);
                 continue;
             }
 
@@ -67,13 +66,13 @@ public class BetterKeysCompat(DatabaseServer databaseServer, ISptLogger<ItemGenP
                 reapplied++;
                 logger.LogWithColor(
                     $"[ItemGen] BetterKeysCompat: key '{keyId}' map='{map}' color '{beforeColor}' -> '{color}' (explicit={explicitColor ?? "null"})",
-                    LogTextColor.Gray);
+                    Color.Grey);
             }
             else
             {
                 logger.LogWithColor(
                     $"[ItemGen] BetterKeysCompat: key '{keyId}' map='{map}' — no color resolved (explicit={explicitColor ?? "null"})",
-                    LogTextColor.Yellow);
+                    Color.Yellow);
             }
         }
 
@@ -81,7 +80,7 @@ public class BetterKeysCompat(DatabaseServer databaseServer, ISptLogger<ItemGenP
         {
             logger.LogWithColor(
                 $"[ItemGen] Re-applied background colors to {reapplied} key(s) after BetterKeys ({(isBetterKeysInstalled ? "using BetterKeys colors" : "using ItemGen defaults")}).",
-                LogTextColor.Gray);
+                Color.Grey);
         }
 
         return Task.CompletedTask;

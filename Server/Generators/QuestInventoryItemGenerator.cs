@@ -6,13 +6,13 @@ using System.Text.Json.Serialization;
 using SPTarkov.Server.Core.Models.Common;
 using SPTarkov.Server.Core.Models.Eft.Common;
 using SPTarkov.Server.Core.Models.Eft.Common.Tables;
-using SPTarkov.Server.Core.Models.Logging;
+using SPTarkov.Server.Core.Models.Spt.Tables;
+using SPTarkov.Common.Models.Logging;
 using SPTarkov.Server.Core.Models.Spt.Mod;
-using SPTarkov.Server.Core.Models.Utils;
-using SPTarkov.Server.Core.Services;
-using SPTarkov.Server.Core.Services.Mod;
+using SPTarkov.Server.Core.Services.Modding.Custom;
 using ItemGen.Converters;
 using ItemGen.Models;
+using SpectreColor = Spectre.Console.Color;
 
 namespace ItemGen.Generators;
 
@@ -20,7 +20,7 @@ public static class QuestInventoryItemGenerator
 {
     public static int RegisterAll(
         CustomItemService customItemService,
-        DatabaseService databaseService,
+        TemplateTable templateTable,
         IReadOnlyList<QuestItemDefinition> definitions,
         ISptLogger<ItemGenPlugin> logger)
     {
@@ -29,14 +29,14 @@ public static class QuestInventoryItemGenerator
         {
             try
             {
-                if (RegisterQuestItem(def, customItemService, databaseService, logger))
+                if (RegisterQuestItem(def, customItemService, templateTable, logger))
                 {
                     registered++;
                 }
             }
             catch (Exception ex)
             {
-                logger.LogWithColor($"[ItemGen] Failed to register quest item '{def.Name}': {ex.Message}", LogTextColor.Red);
+                logger.LogWithColor($"[ItemGen] Failed to register quest item '{def.Name}': {ex.Message}", SpectreColor.Red);
             }
         }
 
@@ -46,11 +46,11 @@ public static class QuestInventoryItemGenerator
     private static bool RegisterQuestItem(
         QuestItemDefinition def,
         CustomItemService customItemService,
-        DatabaseService databaseService,
+        TemplateTable templateTable,
         ISptLogger<ItemGenPlugin> logger)
     {
-        var parentId = ResolveParentId(databaseService, def.BaseTpl);
-        var handbookParentId = ResolveHandbookParent(databaseService, def.BaseTpl);
+        var parentId = ResolveParentId(templateTable, def.BaseTpl);
+        var handbookParentId = ResolveHandbookParent(templateTable, def.BaseTpl);
 
         TemplateItemProperties? overrides = null;
         if (def.Properties.ValueKind != JsonValueKind.Undefined && def.Properties.ValueKind != JsonValueKind.Null)
@@ -84,6 +84,7 @@ public static class QuestInventoryItemGenerator
         var details = new NewItemFromCloneDetails
         {
             NewId = def.Id,
+            NewItemName = def.Name,
             ItemTplToClone = def.BaseTpl,
             ParentId = parentId,
             HandbookParentId = handbookParentId,
@@ -105,7 +106,7 @@ public static class QuestInventoryItemGenerator
 
         if (result.Success == true)
         {
-            var items = databaseService.GetItems();
+            var items = templateTable.Items;
             if (items.TryGetValue(def.Id, out var tpl) && tpl.Properties != null)
             {
                 tpl.Properties.Width = def.Width;
@@ -125,22 +126,22 @@ public static class QuestInventoryItemGenerator
             {
                 logger.LogWithColor(
                     $"[ItemGen] Could not inject bundle path for quest item '{def.Name}' - item not found after clone.",
-                    LogTextColor.Yellow);
+                    SpectreColor.Yellow);
             }
 
-            ValidateLinkedQuests(def, databaseService, logger);
+            ValidateLinkedQuests(def, templateTable, logger);
             return true;
         }
 
         logger.LogWithColor(
             $"[ItemGen] CreateItemFromClone reported failure for quest item '{def.Name}': {string.Join(", ", result.Errors ?? [])}",
-            LogTextColor.Yellow);
+            SpectreColor.Yellow);
         return false;
     }
 
     private static void ValidateLinkedQuests(
         QuestItemDefinition def,
-        DatabaseService databaseService,
+        TemplateTable templateTable,
         ISptLogger<ItemGenPlugin> logger)
     {
         if (def.QuestIds is null || def.QuestIds.Count == 0)
@@ -148,7 +149,7 @@ public static class QuestInventoryItemGenerator
             return;
         }
 
-        var quests = databaseService.GetQuests();
+        var quests = templateTable.Quests;
         foreach (var questId in def.QuestIds)
         {
             if (string.IsNullOrWhiteSpace(questId))
@@ -160,7 +161,7 @@ public static class QuestInventoryItemGenerator
             {
                 logger.LogWithColor(
                     $"[ItemGen] Quest item '{def.Name}' references unknown quest '{questId}'. Make sure the quest is registered by a companion mod (e.g. TraderGen).",
-                    LogTextColor.Yellow);
+                    SpectreColor.Yellow);
                 continue;
             }
 
@@ -173,7 +174,7 @@ public static class QuestInventoryItemGenerator
             {
                 logger.LogWithColor(
                     $"[ItemGen] Quest item '{def.Name}' is linked to quest '{questId}' but that quest does not have a FindItem condition targeting this item.",
-                    LogTextColor.Yellow);
+                    SpectreColor.Yellow);
             }
         }
     }
@@ -196,9 +197,9 @@ public static class QuestInventoryItemGenerator
         return null;
     }
 
-    private static string ResolveParentId(DatabaseService databaseService, string baseTpl)
+    private static string ResolveParentId(TemplateTable templateTable, string baseTpl)
     {
-        var items = databaseService.GetItems();
+        var items = templateTable.Items;
         if (items.TryGetValue(baseTpl, out var baseItem) && !string.IsNullOrWhiteSpace(baseItem.Parent))
         {
             return baseItem.Parent;
@@ -206,12 +207,12 @@ public static class QuestInventoryItemGenerator
         return "5448ecbe4bdc2d60728b4568"; // Info
     }
 
-    private static string ResolveHandbookParent(DatabaseService databaseService, string baseTpl)
+    private static string ResolveHandbookParent(TemplateTable templateTable, string baseTpl)
     {
-        var items = databaseService.GetItems();
+        var items = templateTable.Items;
         if (items.TryGetValue(baseTpl, out var baseItem))
         {
-            var handbook = databaseService.GetHandbook().Items.FirstOrDefault(h => h.Id == baseTpl);
+            var handbook = templateTable.Handbook.Items.FirstOrDefault(h => h.Id == baseTpl);
             if (handbook != null && !string.IsNullOrWhiteSpace(handbook.ParentId))
             {
                 return handbook.ParentId;

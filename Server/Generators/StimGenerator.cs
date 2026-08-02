@@ -6,12 +6,12 @@ using SPTarkov.Server.Core.Models.Common;
 using SPTarkov.Server.Core.Models.Eft.Common;
 using SPTarkov.Server.Core.Models.Eft.Common.Tables;
 using SPTarkov.Server.Core.Models.Enums;
-using SPTarkov.Server.Core.Models.Logging;
+using SPTarkov.Server.Core.Models.Spt.Tables;
+using SPTarkov.Common.Models.Logging;
 using SPTarkov.Server.Core.Models.Spt.Mod;
-using SPTarkov.Server.Core.Models.Utils;
-using SPTarkov.Server.Core.Services;
-using SPTarkov.Server.Core.Services.Mod;
+using SPTarkov.Server.Core.Services.Modding.Custom;
 using ItemGen.Models;
+using SpectreColor = Spectre.Console.Color;
 
 namespace ItemGen.Generators;
 
@@ -21,7 +21,8 @@ public static class StimGenerator
 
     public static int RegisterAll(
         CustomItemService customItemService,
-        DatabaseService databaseService,
+        TemplateTable templateTable,
+        GlobalTable globalTable,
         IReadOnlyList<StimDefinition> definitions,
         ISptLogger<ItemGenPlugin> logger)
     {
@@ -30,14 +31,14 @@ public static class StimGenerator
         {
             try
             {
-                if (RegisterStim(def, customItemService, databaseService, logger))
+                if (RegisterStim(def, customItemService, templateTable, globalTable, logger))
                 {
                     registered++;
                 }
             }
             catch (Exception ex)
             {
-                logger.LogWithColor($"[ItemGen] Failed to register stim '{def.Name}': {ex.Message}", LogTextColor.Red);
+                logger.LogWithColor($"[ItemGen] Failed to register stim '{def.Name}': {ex.Message}", SpectreColor.Red);
             }
         }
 
@@ -47,11 +48,12 @@ public static class StimGenerator
     private static bool RegisterStim(
         StimDefinition def,
         CustomItemService customItemService,
-        DatabaseService databaseService,
+        TemplateTable templateTable,
+        GlobalTable globalTable,
         ISptLogger<ItemGenPlugin> logger)
     {
-        var parentId = ResolveParentId(databaseService, def.BaseTpl);
-        var handbookParentId = ResolveHandbookParent(databaseService, def.BaseTpl);
+        var parentId = ResolveParentId(templateTable, def.BaseTpl);
+        var handbookParentId = ResolveHandbookParent(templateTable, def.BaseTpl);
 
         TemplateItemProperties? overrides = null;
         if (def.Properties.ValueKind != JsonValueKind.Undefined && def.Properties.ValueKind != JsonValueKind.Null)
@@ -105,6 +107,7 @@ public static class StimGenerator
         var details = new NewItemFromCloneDetails
         {
             NewId = def.Id,
+            NewItemName = def.Name,
             ItemTplToClone = def.BaseTpl,
             ParentId = parentId,
             HandbookParentId = handbookParentId,
@@ -127,9 +130,9 @@ public static class StimGenerator
         if (result.Success == true)
         {
             var needsBuffKey = def.CustomBuffs.Count > 0 || def.MaxBodyPartsToHeal > 0;
-            PatchStimulatorBuffs(databaseService, def.Id, def.Name, def.StimulatorBuffs, def.CustomBuffs, buffSetKey, needsBuffKey, logger, true);
+            PatchStimulatorBuffs(globalTable, templateTable, def.Id, def.Name, def.StimulatorBuffs, def.CustomBuffs, buffSetKey, needsBuffKey, logger, true);
 
-            var items = databaseService.GetItems();
+            var items = templateTable.Items;
             if (items.TryGetValue(def.Id, out var tpl) && tpl.Properties != null)
             {
                 if (!string.IsNullOrWhiteSpace(customPrefabPath) && tpl.Properties.Prefab != null)
@@ -159,7 +162,7 @@ public static class StimGenerator
             {
                 logger.LogWithColor(
                     $"[ItemGen] Could not inject bundle path for stim '{def.Name}' - item not found after clone.",
-                    LogTextColor.Yellow);
+                    SpectreColor.Yellow);
             }
 
             return true;
@@ -167,12 +170,13 @@ public static class StimGenerator
 
         logger.LogWithColor(
             $"[ItemGen] CreateItemFromClone reported failure for stim '{def.Name}': {string.Join(", ", result.Errors ?? [])}",
-            LogTextColor.Yellow);
+            SpectreColor.Yellow);
         return false;
     }
 
     public static void PatchStimulatorBuffs(
-        DatabaseService databaseService,
+        GlobalTable globalTable,
+        TemplateTable templateTable,
         string itemId,
         string itemName,
         string stimulatorBuffsName,
@@ -189,12 +193,12 @@ public static class StimGenerator
 
         try
         {
-            var globals = databaseService.GetGlobals();
+            var globals = globalTable;
             var stimulatorBuffs = FindStimulatorBuffs(globals, logger, itemName);
 
             if (stimulatorBuffs == null)
             {
-                logger.LogWithColor($"[ItemGen] Could not patch stimulator buffs for '{itemName}' - globals structure not found.", LogTextColor.Yellow);
+                logger.LogWithColor($"[ItemGen] Could not patch stimulator buffs for '{itemName}' - globals structure not found.", SpectreColor.Yellow);
                 return;
             }
 
@@ -223,7 +227,7 @@ public static class StimGenerator
 
             SetDictionaryValue(stimulatorBuffs, buffSetKey, buffs);
 
-            var items = databaseService.GetItems();
+            var items = templateTable.Items;
             if (items.TryGetValue(itemId, out var tpl))
             {
                 tpl.Properties ??= new TemplateItemProperties();
@@ -240,7 +244,7 @@ public static class StimGenerator
         }
         catch (Exception ex)
         {
-            logger.LogWithColor($"[ItemGen] Failed to patch stimulator buffs for '{itemName}': {ex.Message}", LogTextColor.Yellow);
+            logger.LogWithColor($"[ItemGen] Failed to patch stimulator buffs for '{itemName}': {ex.Message}", SpectreColor.Yellow);
         }
     }
 
@@ -435,9 +439,9 @@ public static class StimGenerator
         return null;
     }
 
-    private static string ResolveParentId(DatabaseService databaseService, string baseTpl)
+    private static string ResolveParentId(TemplateTable templateTable, string baseTpl)
     {
-        var items = databaseService.GetItems();
+        var items = templateTable.Items;
         if (items.TryGetValue(baseTpl, out var baseItem) && !string.IsNullOrWhiteSpace(baseItem.Parent))
         {
             return baseItem.Parent;
@@ -445,12 +449,12 @@ public static class StimGenerator
         return StimParentId;
     }
 
-    private static string ResolveHandbookParent(DatabaseService databaseService, string baseTpl)
+    private static string ResolveHandbookParent(TemplateTable templateTable, string baseTpl)
     {
-        var items = databaseService.GetItems();
+        var items = templateTable.Items;
         if (items.TryGetValue(baseTpl, out var baseItem))
         {
-            var handbook = databaseService.GetHandbook().Items.FirstOrDefault(h => h.Id == baseTpl);
+            var handbook = templateTable.Handbook.Items.FirstOrDefault(h => h.Id == baseTpl);
             if (handbook != null && !string.IsNullOrWhiteSpace(handbook.ParentId))
             {
                 return handbook.ParentId;

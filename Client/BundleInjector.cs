@@ -7,6 +7,8 @@ using System.Reflection;
 using System.Runtime.Serialization;
 using BepInEx.Logging;
 using Comfort.Common;
+using Diz.DependencyManager;
+using Diz.Resources;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using UnityEngine;
@@ -51,7 +53,7 @@ namespace ItemGen.Client
             InjectIntoSystem(easyAssets.System);
         }
 
-        internal static void InjectSingle(DependencyGraphClass<IEasyBundle> system, string assetPath)
+        internal static void InjectSingle(DependencyGraph<IEasyBundle> system, string assetPath)
         {
             if (!_bundleFileByAssetPath.ContainsKey(assetPath))
                 return;
@@ -271,7 +273,7 @@ namespace ItemGen.Client
             }
         }
 
-        private static void InjectIntoSystem(DependencyGraphClass<IEasyBundle> system, string onlyKey = null)
+        private static void InjectIntoSystem(DependencyGraph<IEasyBundle> system, string onlyKey = null)
         {
             if (system == null)
             {
@@ -297,7 +299,7 @@ namespace ItemGen.Client
             var dataField = nodeType.GetField("Data", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
             if (dataField == null)
             {
-                _log?.LogError("GClass1662.Data field not found");
+                _log?.LogError("Node.Data field not found");
                 return;
             }
 
@@ -306,7 +308,7 @@ namespace ItemGen.Client
                 null, new[] { dataField.FieldType }, null);
             if (nodeCtor == null)
             {
-                _log?.LogError("GClass1662 ctor(T) not found");
+                _log?.LogError("Node ctor(T) not found");
                 return;
             }
 
@@ -361,7 +363,7 @@ namespace ItemGen.Client
                 var newNode = nodeCtor.Invoke(new object[] { newBundleData });
                 depsField?.SetValue(newNode, Array.CreateInstance(nodeType, 0));
 
-                nodes.Add(assetPath, (GClass1662<IEasyBundle>)newNode);
+                nodes.Add(assetPath, (Node<IEasyBundle>)newNode);
                 _log?.LogInfo($"Injected IEasyBundle node for {assetPath}");
             }
         }

@@ -1,10 +1,10 @@
 using SPTarkov.Server.Core.Models.Common;
 using SPTarkov.Server.Core.Models.Eft.Hideout;
 using SPTarkov.Server.Core.Models.Enums.Hideout;
-using SPTarkov.Server.Core.Models.Logging;
-using SPTarkov.Server.Core.Models.Utils;
-using SPTarkov.Server.Core.Services;
+using SPTarkov.Server.Core.Models.Spt.Tables;
+using SPTarkov.Common.Models.Logging;
 using ItemGen.Models;
+using Spectre.Console;
 
 namespace ItemGen.Services;
 
@@ -12,14 +12,14 @@ namespace ItemGen.Services;
 public static class CraftingManager
 {
     public static int RegisterAll(
-        DatabaseService databaseService,
+        HideoutTable hideoutTable,
         IReadOnlyList<ItemDefinition> definitions,
         ISptLogger<ItemGenPlugin> logger)
     {
-        var hideout = databaseService.GetHideout();
+        var hideout = hideoutTable;
         if (hideout?.Production?.Recipes == null)
         {
-            logger.LogWithColor("[ItemGen] Could not access hideout production recipes. Crafting will not be added.", LogTextColor.Red);
+            logger.LogWithColor("[ItemGen] Could not access hideout production recipes. Crafting will not be added.", Color.Red);
             return 0;
         }
 
@@ -40,13 +40,13 @@ public static class CraftingManager
             catch (Exception ex)
             {
                 failed++;
-                logger.LogWithColor($"[ItemGen] Failed to add crafting recipe for '{def.Name}': {ex.Message}", LogTextColor.Red);
+                logger.LogWithColor($"[ItemGen] Failed to add crafting recipe for '{def.Name}': {ex.Message}", Color.Red);
             }
         }
 
-        logger.LogWithColor($"[ItemGen] Added {added} crafting recipe(s).", LogTextColor.Green);
+        logger.LogWithColor($"[ItemGen] Added {added} crafting recipe(s).", Color.Green);
         if (failed > 0)
-            logger.LogWithColor($"[ItemGen] {failed} crafting recipe(s) failed.", LogTextColor.Red);
+            logger.LogWithColor($"[ItemGen] {failed} crafting recipe(s) failed.", Color.Red);
 
         return added;
     }

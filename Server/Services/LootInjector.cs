@@ -1,11 +1,10 @@
 using System.Linq;
 using SPTarkov.Server.Core.Models.Common;
 using SPTarkov.Server.Core.Models.Eft.Common;
-using SPTarkov.Server.Core.Models.Logging;
-using SPTarkov.Server.Core.Models.Utils;
-using SPTarkov.Server.Core.Services;
-using SPTarkov.Server.Core.Utils.Json;
+using SPTarkov.Server.Core.Models.Spt.Tables;
+using SPTarkov.Common.Models.Logging;
 using ItemGen.Models;
+using Spectre.Console;
 
 namespace ItemGen.Services;
 
@@ -27,15 +26,15 @@ public static class LootInjector
         int Probability);
 
     public static int InjectAll(
-        DatabaseService databaseService,
+        LocationTable locationTable,
         IReadOnlyList<ItemDefinition> items,
         ISptLogger<ItemGenPlugin> logger,
         bool debug = false)
     {
-        var locations = databaseService.GetLocations();
+        var locations = locationTable;
         if (locations == null)
         {
-            logger.LogWithColor("[ItemGen] No locations found in database, skipping loot injection.", LogTextColor.Yellow);
+            logger.LogWithColor("[ItemGen] No locations found in database, skipping loot injection.", Color.Yellow);
             return 0;
         }
 
@@ -43,7 +42,7 @@ public static class LootInjector
         var processedDefinitions = BuildInjectionDefinitions(items, logger);
         if (processedDefinitions.Count == 0)
         {
-            logger.LogWithColor("[ItemGen] No items have loot injection enabled, skipping.", LogTextColor.Gray);
+            logger.LogWithColor("[ItemGen] No items have loot injection enabled, skipping.", Color.Grey);
             return 0;
         }
 
@@ -58,13 +57,13 @@ public static class LootInjector
 
         logger.LogWithColor(
             $"[ItemGen] Registered loot injection transformer for {locationCount} location(s) covering {processedDefinitions.Count} item definition(s).",
-            LogTextColor.Green);
+            Color.Green);
 
         foreach (var def in processedDefinitions)
         {
             logger.LogWithColor(
                 $"[ItemGen] {def.Name}: items [{string.Join(", ", def.ItemsToInject)}] -> containers [{string.Join(", ", def.ContainerIds)}] at probability {def.Probability}.",
-                LogTextColor.Gray);
+                Color.Grey);
         }
 
         return processedDefinitions.Count;
@@ -130,7 +129,7 @@ public static class LootInjector
                         if (debug)
                             logger.LogWithColor(
                                 $"[ItemGen][Debug] Updated '{itemId}' probability in '{containerId}' to {def.Probability}.",
-                                LogTextColor.Gray);
+                                Color.Grey);
                     }
                     else
                     {
@@ -138,7 +137,7 @@ public static class LootInjector
                         if (debug)
                             logger.LogWithColor(
                                 $"[ItemGen][Debug] Added '{itemId}' to '{containerId}' with probability {def.Probability}.",
-                                LogTextColor.Gray);
+                                Color.Grey);
                     }
                     injected++;
                 }
@@ -151,7 +150,7 @@ public static class LootInjector
         {
             logger.LogWithColor(
                 $"[ItemGen] Warning: {containersNotFound.Count} container ID(s) were not found in static loot: {string.Join(", ", containersNotFound)}.",
-                LogTextColor.Yellow);
+                Color.Red);
         }
 
         return staticLoot;

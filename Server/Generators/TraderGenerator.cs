@@ -2,11 +2,10 @@ using SPTarkov.Server.Core.Models.Common;
 using SPTarkov.Server.Core.Models.Eft.Common;
 using SPTarkov.Server.Core.Models.Eft.Common.Tables;
 using SPTarkov.Server.Core.Models.Enums;
-using SPTarkov.Server.Core.Models.Logging;
-using SPTarkov.Server.Core.Models.Spt.Mod;
-using SPTarkov.Server.Core.Models.Utils;
-using SPTarkov.Server.Core.Services;
+using SPTarkov.Server.Core.Models.Spt.Tables;
+using SPTarkov.Common.Models.Logging;
 using ItemGen.Models;
+using SpectreColor = Spectre.Console.Color;
 
 namespace ItemGen.Generators;
 
@@ -15,11 +14,12 @@ public static class TraderGenerator
     private const string RoublesTpl = "5449016a4bdc2d6f028b456f";
 
     public static int RegisterAll(
-        DatabaseService databaseService,
+        TemplateTable templateTable,
+        TradersTable tradersTable,
         IEnumerable<ItemPackDefinition> packs,
         ISptLogger<ItemGenPlugin> logger)
     {
-        var traders = databaseService.GetTraders();
+        var traders = tradersTable;
         var added = 0;
 
         foreach (var pack in packs)
@@ -45,7 +45,7 @@ public static class TraderGenerator
 
                     try
                     {
-                        if (AddToTrader(databaseService, traders, traderDef.TraderId, entry, logger))
+                        if (AddToTrader(templateTable, traders, traderDef.TraderId, entry, logger))
                         {
                             added++;
                         }
@@ -54,7 +54,7 @@ public static class TraderGenerator
                     {
                         logger.LogWithColor(
                             $"[ItemGen] Failed to add trader entry for item '{entry.ItemId}' on trader '{traderDef.TraderId}': {ex.Message}",
-                            LogTextColor.Yellow);
+                            SpectreColor.Red);
                     }
                 }
             }
@@ -62,15 +62,15 @@ public static class TraderGenerator
 
         if (added > 0)
         {
-            logger.LogWithColor($"[ItemGen] Added {added} trader entry/entries across all packs.", LogTextColor.Green);
+            logger.LogWithColor($"[ItemGen] Added {added} trader entry/entries across all packs.", SpectreColor.Green);
         }
 
         return added;
     }
 
     private static bool AddToTrader(
-        DatabaseService databaseService,
-        dynamic traders,
+        TemplateTable templateTable,
+        TradersTable traders,
         string traderId,
         TraderItemEntry entry,
         ISptLogger<ItemGenPlugin> logger)
@@ -81,7 +81,7 @@ public static class TraderGenerator
         {
             logger.LogWithColor(
                 $"[ItemGen] Trader '{traderId}' not found. Skipping entry for item '{entry.ItemId}'.",
-                LogTextColor.Yellow);
+                SpectreColor.Red);
             return false;
         }
 
@@ -92,17 +92,17 @@ public static class TraderGenerator
         {
             logger.LogWithColor(
                 $"[ItemGen] Trader '{traderId}' has no assort. Skipping entry for item '{entry.ItemId}'.",
-                LogTextColor.Yellow);
+                SpectreColor.Red);
             return false;
         }
 
         var itemTemplateId = new MongoId(entry.ItemId);
-        var items = databaseService.GetItems();
+        var items = templateTable.Items;
         if (!items.ContainsKey(entry.ItemId))
         {
             logger.LogWithColor(
                 $"[ItemGen] Cannot add item '{entry.ItemId}' to trader '{traderId}' - item not registered.",
-                LogTextColor.Yellow);
+                SpectreColor.Red);
             return false;
         }
 

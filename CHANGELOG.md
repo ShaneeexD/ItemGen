@@ -1,5 +1,15 @@
 # Changelog
 
+## v1.5.1
+- **SPT 4.1 compatibility** - updated server and client for SPT 4.1.x (new DI tables, async lifecycle, IModMetadata, Spectre.Console.Color logging, namespace moves).
+- **Not backward compatible** - this version requires SPT 4.1.x and will not work with SPT 4.0.x or earlier.
+
+## v1.5.0
+- **BetterKeys compatibility** - ItemGen keys now integrate with BetterKeys: map-specific background colors, key descriptions with Tips, Required Extracts, Required Quests, and Behind the Lock loot info. Colors are re-applied after BetterKeys loads to prevent overrides.
+- **Custom models for keys** - keys now support Custom Model and Use Model bundle paths, matching the same pattern used by other item types.
+- **Bartering for custom items** - custom items can now be added as barter offers in trader inventories.
+- **Removed custom stim patch** - the stim effects/damage patch has been removed due to instability and conflicts with other items.
+
 ## v1.4.0
 - **Custom Barter items** - a new `barters` category lets you clone any vanilla barter item, override `parent`/`handbookParentId`, `stackMaxSize`, `width`/`height`, `itemSound`, and `properties`.
 - **Custom Food and Drink items** - a new `foodDrinks` category lets you create one-use snacks or multi-use food/drink items with configurable `maxResource`/`resource`, `foodUseTime`, `foodEffectType`, health effects (Hydration/Energy), and damage effects.

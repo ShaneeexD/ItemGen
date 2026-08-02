@@ -6,12 +6,12 @@ using ItemGen.Converters;
 using SPTarkov.Server.Core.Models.Common;
 using SPTarkov.Server.Core.Models.Eft.Common;
 using SPTarkov.Server.Core.Models.Eft.Common.Tables;
-using SPTarkov.Server.Core.Models.Logging;
+using SPTarkov.Server.Core.Models.Spt.Tables;
+using SPTarkov.Common.Models.Logging;
 using SPTarkov.Server.Core.Models.Spt.Mod;
-using SPTarkov.Server.Core.Models.Utils;
-using SPTarkov.Server.Core.Services;
-using SPTarkov.Server.Core.Services.Mod;
+using SPTarkov.Server.Core.Services.Modding.Custom;
 using ItemGen.Models;
+using SpectreColor = Spectre.Console.Color;
 using MongoId = SPTarkov.Server.Core.Models.Common.MongoId;
 
 namespace ItemGen.Generators;
@@ -20,7 +20,7 @@ public static class ContainerGenerator
 {
     public static int RegisterAll(
         CustomItemService customItemService,
-        DatabaseService databaseService,
+        TemplateTable templateTable,
         IReadOnlyList<ContainerDefinition> definitions,
         ISptLogger<ItemGenPlugin> logger)
     {
@@ -30,7 +30,7 @@ public static class ContainerGenerator
         {
             try
             {
-                var (success, patched) = RegisterContainer(def, customItemService, databaseService, logger);
+                var (success, patched) = RegisterContainer(def, customItemService, templateTable, logger);
                 if (success)
                 {
                     registered++;
@@ -40,13 +40,13 @@ public static class ContainerGenerator
             }
             catch (Exception ex)
             {
-                logger.LogWithColor($"[ItemGen] Failed to register container '{def.Name}': {ex.Message}", LogTextColor.Red);
+                logger.LogWithColor($"[ItemGen] Failed to register container '{def.Name}': {ex.Message}", SpectreColor.Red);
             }
         }
 
         if (safeContainersPatched > 0)
         {
-            logger.LogWithColor($"[ItemGen] Patched {safeContainersPatched} safe container filter(s) across all containers.", LogTextColor.Green);
+            logger.LogWithColor($"[ItemGen] Patched {safeContainersPatched} safe container filter(s) across all containers.", SpectreColor.Gray);
         }
 
         return registered;
@@ -55,11 +55,11 @@ public static class ContainerGenerator
     private static (bool success, int safeContainerPatches) RegisterContainer(
         ContainerDefinition def,
         CustomItemService customItemService,
-        DatabaseService databaseService,
+        TemplateTable templateTable,
         ISptLogger<ItemGenPlugin> logger)
     {
-        var parentId = ResolveParentId(databaseService, def);
-        var handbookParentId = ResolveHandbookParent(databaseService, def);
+        var parentId = ResolveParentId(templateTable, def);
+        var handbookParentId = ResolveHandbookParent(templateTable, def);
 
         TemplateItemProperties? overrides = null;
         if (def.Properties.ValueKind != JsonValueKind.Undefined && def.Properties.ValueKind != JsonValueKind.Null)
@@ -91,6 +91,7 @@ public static class ContainerGenerator
         var details = new NewItemFromCloneDetails
         {
             NewId = def.Id,
+            NewItemName = def.Name,
             ItemTplToClone = def.BaseTpl,
             ParentId = parentId,
             HandbookParentId = handbookParentId,
@@ -112,9 +113,9 @@ public static class ContainerGenerator
 
         if (result.Success == true)
         {
-            var patched = PatchSafeContainerFilters(databaseService, def, logger);
+            var patched = PatchSafeContainerFilters(templateTable, def, logger);
 
-            var items = databaseService.GetItems();
+            var items = templateTable.Items;
             if (items.TryGetValue(def.Id, out var tpl) && tpl.Properties != null)
             {
                 if (!string.IsNullOrWhiteSpace(customPrefabPath) && tpl.Properties.Prefab != null)
@@ -131,7 +132,7 @@ public static class ContainerGenerator
             {
                 logger.LogWithColor(
                     $"[ItemGen] Could not inject bundle path for container '{def.Name}' - item not found after clone.",
-                    LogTextColor.Yellow);
+                    SpectreColor.Yellow);
             }
 
             return (true, patched);
@@ -139,7 +140,7 @@ public static class ContainerGenerator
 
         logger.LogWithColor(
             $"[ItemGen] CreateItemFromClone reported failure for container '{def.Name}': {string.Join(", ", result.Errors ?? [])}",
-            LogTextColor.Yellow);
+            SpectreColor.Yellow);
         return (false, 0);
     }
 
@@ -156,13 +157,13 @@ public static class ContainerGenerator
     };
 
     private static int PatchSafeContainerFilters(
-        DatabaseService databaseService,
+        TemplateTable templateTable,
         ContainerDefinition def,
         ISptLogger<ItemGenPlugin> logger)
     {
         if (def.SafeContainerMode == SafeContainerMode.Include && def.SafeContainerIds.Count == 0)
         {
-            logger.LogWithColor($"[ItemGen] Container '{def.Name}' has safeContainerMode 'include' but no IDs; skipping safe-container patch.", LogTextColor.Yellow);
+            logger.LogWithColor($"[ItemGen] Container '{def.Name}' has safeContainerMode 'include' but no IDs; skipping safe-container patch.", SpectreColor.Yellow);
             return 0;
         }
 
@@ -175,7 +176,7 @@ public static class ContainerGenerator
         };
 
         var itemId = new MongoId(def.Id);
-        var items = databaseService.GetItems();
+        var items = templateTable.Items;
         var patched = 0;
         foreach (var safeId in targetIds)
         {
@@ -225,14 +226,14 @@ public static class ContainerGenerator
         return null;
     }
 
-    private static string ResolveParentId(DatabaseService databaseService, ContainerDefinition def)
+    private static string ResolveParentId(TemplateTable templateTable, ContainerDefinition def)
     {
         if (!string.IsNullOrWhiteSpace(def.Parent))
         {
             return def.Parent;
         }
 
-        var items = databaseService.GetItems();
+        var items = templateTable.Items;
         if (items.TryGetValue(def.BaseTpl, out var baseItem) && !string.IsNullOrWhiteSpace(baseItem.Parent))
         {
             return baseItem.Parent;
@@ -240,17 +241,17 @@ public static class ContainerGenerator
         return "5795f317245977243854e041"; // SimpleContainer
     }
 
-    private static string ResolveHandbookParent(DatabaseService databaseService, ContainerDefinition def)
+    private static string ResolveHandbookParent(TemplateTable templateTable, ContainerDefinition def)
     {
         if (!string.IsNullOrWhiteSpace(def.HandbookParentId))
         {
             return def.HandbookParentId;
         }
 
-        var items = databaseService.GetItems();
+        var items = templateTable.Items;
         if (items.TryGetValue(def.BaseTpl, out var baseItem))
         {
-            var handbook = databaseService.GetHandbook().Items.FirstOrDefault(h => h.Id == def.BaseTpl);
+            var handbook = templateTable.Handbook.Items.FirstOrDefault(h => h.Id == def.BaseTpl);
             if (handbook != null && !string.IsNullOrWhiteSpace(handbook.ParentId))
             {
                 return handbook.ParentId;

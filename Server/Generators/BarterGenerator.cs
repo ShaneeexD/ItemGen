@@ -4,12 +4,12 @@ using ItemGen.Converters;
 using SPTarkov.Server.Core.Models.Common;
 using SPTarkov.Server.Core.Models.Eft.Common;
 using SPTarkov.Server.Core.Models.Eft.Common.Tables;
-using SPTarkov.Server.Core.Models.Logging;
+using SPTarkov.Server.Core.Models.Spt.Tables;
+using SPTarkov.Common.Models.Logging;
 using SPTarkov.Server.Core.Models.Spt.Mod;
-using SPTarkov.Server.Core.Models.Utils;
-using SPTarkov.Server.Core.Services;
-using SPTarkov.Server.Core.Services.Mod;
+using SPTarkov.Server.Core.Services.Modding.Custom;
 using ItemGen.Models;
+using SpectreColor = Spectre.Console.Color;
 
 namespace ItemGen.Generators;
 
@@ -20,7 +20,7 @@ public static class BarterGenerator
 
     public static int RegisterAll(
         CustomItemService customItemService,
-        DatabaseService databaseService,
+        TemplateTable templateTable,
         IReadOnlyList<BarterDefinition> definitions,
         ISptLogger<ItemGenPlugin> logger)
     {
@@ -29,14 +29,14 @@ public static class BarterGenerator
         {
             try
             {
-                if (RegisterBarter(def, customItemService, databaseService, logger))
+                if (RegisterBarter(def, customItemService, templateTable, logger))
                 {
                     registered++;
                 }
             }
             catch (Exception ex)
             {
-                logger.LogWithColor($"[ItemGen] Failed to register barter item '{def.Name}': {ex.Message}", LogTextColor.Red);
+                logger.LogWithColor($"[ItemGen] Failed to register barter item '{def.Name}': {ex.Message}", SpectreColor.Red);
             }
         }
 
@@ -46,11 +46,11 @@ public static class BarterGenerator
     private static bool RegisterBarter(
         BarterDefinition def,
         CustomItemService customItemService,
-        DatabaseService databaseService,
+        TemplateTable templateTable,
         ISptLogger<ItemGenPlugin> logger)
     {
-        var parentId = ResolveParentId(databaseService, def.BaseTpl, def.Parent);
-        var handbookParentId = ResolveHandbookParent(databaseService, def.BaseTpl, def.HandbookParentId);
+        var parentId = ResolveParentId(templateTable, def.BaseTpl, def.Parent);
+        var handbookParentId = ResolveHandbookParent(templateTable, def.BaseTpl, def.HandbookParentId);
 
         TemplateItemProperties? overrides = null;
         if (def.Properties.ValueKind != JsonValueKind.Undefined && def.Properties.ValueKind != JsonValueKind.Null)
@@ -87,6 +87,7 @@ public static class BarterGenerator
         var details = new NewItemFromCloneDetails
         {
             NewId = def.Id,
+            NewItemName = def.Name,
             ItemTplToClone = def.BaseTpl,
             ParentId = parentId,
             HandbookParentId = handbookParentId,
@@ -108,7 +109,7 @@ public static class BarterGenerator
 
         if (result.Success == true)
         {
-            var items = databaseService.GetItems();
+            var items = templateTable.Items;
             if (items.TryGetValue(def.Id, out var tpl) && tpl.Properties != null)
             {
                 tpl.Properties.Width = def.Width;
@@ -128,7 +129,7 @@ public static class BarterGenerator
             {
                 logger.LogWithColor(
                     $"[ItemGen] Could not inject bundle path for barter item '{def.Name}' - item not found after clone.",
-                    LogTextColor.Yellow);
+                    SpectreColor.Yellow);
             }
 
             return true;
@@ -136,7 +137,7 @@ public static class BarterGenerator
 
         logger.LogWithColor(
             $"[ItemGen] CreateItemFromClone reported failure for barter item '{def.Name}': {string.Join(", ", result.Errors ?? [])}",
-            LogTextColor.Yellow);
+            SpectreColor.Yellow);
         return false;
     }
 
@@ -158,14 +159,14 @@ public static class BarterGenerator
         return null;
     }
 
-    private static string ResolveParentId(DatabaseService databaseService, string baseTpl, string configuredParent)
+    private static string ResolveParentId(TemplateTable templateTable, string baseTpl, string configuredParent)
     {
         if (!string.IsNullOrWhiteSpace(configuredParent) && configuredParent != BarterParentId)
         {
             return configuredParent;
         }
 
-        var items = databaseService.GetItems();
+        var items = templateTable.Items;
         if (items.TryGetValue(baseTpl, out var baseItem) && !string.IsNullOrWhiteSpace(baseItem.Parent))
         {
             return baseItem.Parent;
@@ -173,17 +174,17 @@ public static class BarterGenerator
         return BarterParentId;
     }
 
-    private static string ResolveHandbookParent(DatabaseService databaseService, string baseTpl, string configuredHandbookParent)
+    private static string ResolveHandbookParent(TemplateTable templateTable, string baseTpl, string configuredHandbookParent)
     {
         if (!string.IsNullOrWhiteSpace(configuredHandbookParent) && configuredHandbookParent != BarterHandbookParentId)
         {
             return configuredHandbookParent;
         }
 
-        var items = databaseService.GetItems();
+        var items = templateTable.Items;
         if (items.TryGetValue(baseTpl, out var baseItem))
         {
-            var handbook = databaseService.GetHandbook().Items.FirstOrDefault(h => h.Id == baseTpl);
+            var handbook = templateTable.Handbook.Items.FirstOrDefault(h => h.Id == baseTpl);
             if (handbook != null && !string.IsNullOrWhiteSpace(handbook.ParentId))
             {
                 return handbook.ParentId;

@@ -8,12 +8,12 @@ using ItemGen.Converters;
 using SPTarkov.Server.Core.Models.Common;
 using SPTarkov.Server.Core.Models.Eft.Common;
 using SPTarkov.Server.Core.Models.Eft.Common.Tables;
-using SPTarkov.Server.Core.Models.Logging;
+using SPTarkov.Server.Core.Models.Spt.Tables;
+using SPTarkov.Common.Models.Logging;
 using SPTarkov.Server.Core.Models.Spt.Mod;
-using SPTarkov.Server.Core.Models.Utils;
-using SPTarkov.Server.Core.Services;
-using SPTarkov.Server.Core.Services.Mod;
+using SPTarkov.Server.Core.Services.Modding.Custom;
 using ItemGen.Models;
+using SpectreColor = Spectre.Console.Color;
 
 namespace ItemGen.Generators;
 
@@ -39,7 +39,7 @@ public static class KeyGenerator
 
     public static int RegisterAll(
         CustomItemService customItemService,
-        DatabaseService databaseService,
+        TemplateTable templateTable,
         IReadOnlyList<KeyDefinition> definitions,
         ISptLogger<ItemGenPlugin> logger)
     {
@@ -50,7 +50,7 @@ public static class KeyGenerator
         {
             try
             {
-                if (RegisterKey(def, customItemService, databaseService, logger))
+                if (RegisterKey(def, customItemService, templateTable, logger))
                 {
                     registered++;
                     registeredKeysWithMap.Add((def, true));
@@ -58,7 +58,7 @@ public static class KeyGenerator
             }
             catch (Exception ex)
             {
-                logger.LogWithColor($"[ItemGen] Failed to register key '{def.Name}': {ex.Message}", LogTextColor.Red);
+                logger.LogWithColor($"[ItemGen] Failed to register key '{def.Name}': {ex.Message}", SpectreColor.Red);
             }
         }
 
@@ -77,7 +77,7 @@ public static class KeyGenerator
             .ToList();
         if (mapKeys.Count > 0)
         {
-            PatchBetterKeysDb(mapKeys, databaseService, logger);
+            PatchBetterKeysDb(mapKeys, templateTable, logger);
         }
 
         return registered;
@@ -86,11 +86,11 @@ public static class KeyGenerator
     private static bool RegisterKey(
         KeyDefinition def,
         CustomItemService customItemService,
-        DatabaseService databaseService,
+        TemplateTable templateTable,
         ISptLogger<ItemGenPlugin> logger)
     {
-        var parentId = ResolveParentId(databaseService, def.BaseTpl);
-        var handbookParentId = ResolveHandbookParent(databaseService, def.BaseTpl);
+        var parentId = ResolveParentId(templateTable, def.BaseTpl);
+        var handbookParentId = ResolveHandbookParent(templateTable, def.BaseTpl);
 
         TemplateItemProperties? overrides = null;
         if (def.Properties.ValueKind != JsonValueKind.Undefined && def.Properties.ValueKind != JsonValueKind.Null)
@@ -135,6 +135,7 @@ public static class KeyGenerator
         var details = new NewItemFromCloneDetails
         {
             NewId = def.Id,
+            NewItemName = def.Name,
             ItemTplToClone = def.BaseTpl,
             ParentId = parentId,
             HandbookParentId = handbookParentId,
@@ -156,7 +157,7 @@ public static class KeyGenerator
 
         if (result.Success == true)
         {
-            var items = databaseService.GetItems();
+            var items = templateTable.Items;
             if (items.TryGetValue(def.Id, out var tpl) && tpl.Properties != null)
             {
                 // Re-apply BackgroundColor after creation to ensure it isn't overridden by other mods
@@ -180,7 +181,7 @@ public static class KeyGenerator
             {
                 logger.LogWithColor(
                     $"[ItemGen] Could not inject bundle path for key '{def.Name}' - item not found after clone.",
-                    LogTextColor.Yellow);
+                    SpectreColor.Yellow);
             }
 
             return true;
@@ -188,7 +189,7 @@ public static class KeyGenerator
 
         logger.LogWithColor(
             $"[ItemGen] CreateItemFromClone reported failure for key '{def.Name}': {string.Join(", ", result.Errors ?? [])}",
-            LogTextColor.Yellow);
+            SpectreColor.Yellow);
         return false;
     }
 
@@ -210,9 +211,9 @@ public static class KeyGenerator
         return null;
     }
 
-    private static string ResolveParentId(DatabaseService databaseService, string baseTpl)
+    private static string ResolveParentId(TemplateTable templateTable, string baseTpl)
     {
-        var items = databaseService.GetItems();
+        var items = templateTable.Items;
         if (items.TryGetValue(baseTpl, out var baseItem) && !string.IsNullOrWhiteSpace(baseItem.Parent))
         {
             return baseItem.Parent;
@@ -220,12 +221,12 @@ public static class KeyGenerator
         return KeyMechanicalParentId;
     }
 
-    private static string ResolveHandbookParent(DatabaseService databaseService, string baseTpl)
+    private static string ResolveHandbookParent(TemplateTable templateTable, string baseTpl)
     {
-        var items = databaseService.GetItems();
+        var items = templateTable.Items;
         if (items.TryGetValue(baseTpl, out var baseItem))
         {
-            var handbook = databaseService.GetHandbook().Items.FirstOrDefault(h => h.Id == baseTpl);
+            var handbook = templateTable.Handbook.Items.FirstOrDefault(h => h.Id == baseTpl);
             if (handbook != null && !string.IsNullOrWhiteSpace(handbook.ParentId))
             {
                 return handbook.ParentId;
@@ -241,7 +242,7 @@ public static class KeyGenerator
         "Safe", "LooseVals", "LooseCash", "LooseLoot", "LooseGear"
     };
 
-    private static void PatchBetterKeysDb(List<KeyDefinition> mapKeys, DatabaseService databaseService, ISptLogger<ItemGenPlugin> logger)
+    private static void PatchBetterKeysDb(List<KeyDefinition> mapKeys, TemplateTable templateTable, ISptLogger<ItemGenPlugin> logger)
     {
         var modsDir = IOPath.Combine(Directory.GetCurrentDirectory(), "user", "mods");
         if (!Directory.Exists(modsDir))
@@ -276,14 +277,14 @@ public static class KeyGenerator
 
                 var validLoot = def.BkLoot.Where(l => ValidBkLootTypes.Contains(l)).ToList();
 
-                var quests = databaseService.GetQuests();
+                var quests = templateTable.Quests;
                 var validQuests = def.BkQuests.Where(q => quests.ContainsKey(q)).ToList();
                 if (validQuests.Count != def.BkQuests.Count)
                 {
                     var skipped = def.BkQuests.Except(validQuests);
                     logger.LogWithColor(
                         $"[ItemGen] Skipped invalid quest ID(s) for key '{def.Name}': {string.Join(", ", skipped)}",
-                        LogTextColor.Yellow);
+                        SpectreColor.Yellow);
                 }
 
                 // Always update (handles both new and existing keys)

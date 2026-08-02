@@ -3,13 +3,15 @@ using System.Collections;
 using BepInEx;
 using BepInEx.Logging;
 using Comfort.Common;
+using Diz.DependencyManager;
+using Diz.Resources;
 using EFT;
 using HarmonyLib;
 using UnityEngine;
 
 namespace ItemGen.Client
 {
-    [BepInPlugin("com.serenity.itemgen", "ItemGen Client", "1.4.2")]
+    [BepInPlugin("com.serenity.itemgen", "ItemGen Client", "1.5.1")]
     public class Plugin : BaseUnityPlugin
     {
         public static ManualLogSource Log { get; private set; }
@@ -41,10 +43,10 @@ namespace ItemGen.Client
     }
 
     // If a custom prefab path is requested before the bundle is injected, inject it on demand.
-    [HarmonyPatch(typeof(DependencyGraphClass<IEasyBundle>), "GetNode")]
+    [HarmonyPatch(typeof(DependencyGraph<IEasyBundle>), "GetNode")]
     internal static class GetNodePatch
     {
-        static void Prefix(DependencyGraphClass<IEasyBundle> __instance, string key)
+        static void Prefix(DependencyGraph<IEasyBundle> __instance, string key)
         {
             try
             {

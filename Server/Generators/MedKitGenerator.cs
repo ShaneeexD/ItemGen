@@ -5,12 +5,12 @@ using SPTarkov.Server.Core.Models.Common;
 using SPTarkov.Server.Core.Models.Eft.Common;
 using SPTarkov.Server.Core.Models.Eft.Common.Tables;
 using SPTarkov.Server.Core.Models.Enums;
-using SPTarkov.Server.Core.Models.Logging;
+using SPTarkov.Server.Core.Models.Spt.Tables;
+using SPTarkov.Common.Models.Logging;
 using SPTarkov.Server.Core.Models.Spt.Mod;
-using SPTarkov.Server.Core.Models.Utils;
-using SPTarkov.Server.Core.Services;
-using SPTarkov.Server.Core.Services.Mod;
+using SPTarkov.Server.Core.Services.Modding.Custom;
 using ItemGen.Models;
+using SpectreColor = Spectre.Console.Color;
 
 namespace ItemGen.Generators;
 
@@ -21,7 +21,7 @@ public static class MedKitGenerator
 
     public static int RegisterAll(
         CustomItemService customItemService,
-        DatabaseService databaseService,
+        TemplateTable templateTable,
         IReadOnlyList<MedKitDefinition> definitions,
         ISptLogger<ItemGenPlugin> logger)
     {
@@ -30,14 +30,14 @@ public static class MedKitGenerator
         {
             try
             {
-                if (RegisterMedKit(def, customItemService, databaseService, logger))
+                if (RegisterMedKit(def, customItemService, templateTable, logger))
                 {
                     registered++;
                 }
             }
             catch (Exception ex)
             {
-                logger.LogWithColor($"[ItemGen] Failed to register medkit '{def.Name}': {ex.Message}", LogTextColor.Red);
+                logger.LogWithColor($"[ItemGen] Failed to register medkit '{def.Name}': {ex.Message}", SpectreColor.Red);
             }
         }
 
@@ -47,11 +47,11 @@ public static class MedKitGenerator
     private static bool RegisterMedKit(
         MedKitDefinition def,
         CustomItemService customItemService,
-        DatabaseService databaseService,
+        TemplateTable templateTable,
         ISptLogger<ItemGenPlugin> logger)
     {
-        var parentId = ResolveParentId(databaseService, def.BaseTpl);
-        var handbookParentId = ResolveHandbookParent(databaseService, def.BaseTpl);
+        var parentId = ResolveParentId(templateTable, def.BaseTpl);
+        var handbookParentId = ResolveHandbookParent(templateTable, def.BaseTpl);
 
         TemplateItemProperties? overrides = null;
         if (def.Properties.ValueKind != JsonValueKind.Undefined && def.Properties.ValueKind != JsonValueKind.Null)
@@ -97,6 +97,7 @@ public static class MedKitGenerator
         var details = new NewItemFromCloneDetails
         {
             NewId = def.Id,
+            NewItemName = def.Name,
             ItemTplToClone = def.BaseTpl,
             ParentId = parentId,
             HandbookParentId = handbookParentId,
@@ -118,10 +119,10 @@ public static class MedKitGenerator
 
         if (result.Success == true)
         {
-            var items = databaseService.GetItems();
+            var items = templateTable.Items;
             if (items.TryGetValue(def.Id, out var tpl) && tpl.Properties != null)
             {
-                logger.LogWithColor($"[ItemGen] MedKit '{def.Name}' registered. BackgroundColor = '{tpl.Properties.BackgroundColor}', Parent = '{tpl.Parent}'", LogTextColor.Gray);
+                logger.LogWithColor($"[ItemGen] MedKit '{def.Name}' registered. BackgroundColor = '{tpl.Properties.BackgroundColor}', Parent = '{tpl.Parent}'", SpectreColor.Gray);
 
                 if (!string.IsNullOrWhiteSpace(customPrefabPath) && tpl.Properties.Prefab != null)
                 {
@@ -150,7 +151,7 @@ public static class MedKitGenerator
             {
                 logger.LogWithColor(
                     $"[ItemGen] Could not inject bundle path for medkit '{def.Name}' - item not found after clone.",
-                    LogTextColor.Yellow);
+                    SpectreColor.Yellow);
             }
 
             return true;
@@ -158,7 +159,7 @@ public static class MedKitGenerator
 
         logger.LogWithColor(
             $"[ItemGen] CreateItemFromClone reported failure for medkit '{def.Name}': {string.Join(", ", result.Errors ?? [])}",
-            LogTextColor.Yellow);
+            SpectreColor.Yellow);
         return false;
     }
 
@@ -180,9 +181,9 @@ public static class MedKitGenerator
         return null;
     }
 
-    private static string ResolveParentId(DatabaseService databaseService, string baseTpl)
+    private static string ResolveParentId(TemplateTable templateTable, string baseTpl)
     {
-        var items = databaseService.GetItems();
+        var items = templateTable.Items;
         if (items.TryGetValue(baseTpl, out var baseItem) && !string.IsNullOrWhiteSpace(baseItem.Parent))
         {
             return baseItem.Parent;
@@ -190,12 +191,12 @@ public static class MedKitGenerator
         return MedKitParentId;
     }
 
-    private static string ResolveHandbookParent(DatabaseService databaseService, string baseTpl)
+    private static string ResolveHandbookParent(TemplateTable templateTable, string baseTpl)
     {
-        var items = databaseService.GetItems();
+        var items = templateTable.Items;
         if (items.TryGetValue(baseTpl, out var baseItem))
         {
-            var handbook = databaseService.GetHandbook().Items.FirstOrDefault(h => h.Id == baseTpl);
+            var handbook = templateTable.Handbook.Items.FirstOrDefault(h => h.Id == baseTpl);
             if (handbook != null && !string.IsNullOrWhiteSpace(handbook.ParentId))
             {
                 return handbook.ParentId;
